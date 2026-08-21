@@ -1,0 +1,299 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: cd-production-oiap
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: 543828674554.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: oiap-backend
+  ECS_CLUSTER: oiap-cluster
+  ECS_SERVICE: oiap-backend-task-service-9yujqa33
+  ECS_TASK_FAMILY: oiap-backend-task
+  CONTAINER_NAME: Main
+
+jobs:
+  deploy-backend:
+    name: Build image and deploy backend to ECS Fargate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::543828674554:role/oiap-github-actions-deploy-role
+          role-session-name: oiap-cd-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        id: image
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}"
+
+          docker build \
+            --platform linux/amd64 \
+            --file Dockerfile \
+            --tag "${IMAGE_URI}" \
+            .
+
+          docker push "${IMAGE_URI}"
+
+          echo "uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          echo "Pushed ${IMAGE_URI}"
+
+      - name: Resolve the task definition the service is running
+        id: current
+        run: |
+          set -euo pipefail
+          TASK_DEFINITION_ARN="$(
+            aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_SERVICE}" \
+              --query 'services[0].taskDefinition' \
+              --output text
+          )"
+
+          if [ -z "${TASK_DEFINITION_ARN}" ] || [ "${TASK_DEFINITION_ARN}" = "None" ]; then
+            echo "::error::Could not resolve a task definition for service ${ECS_SERVICE}"
+            exit 1
+          fi
+
+          case "${TASK_DEFINITION_ARN}" in
+            *":task-definition/${ECS_TASK_FAMILY}:"*) ;;
+            *)
+              echo "::error::${TASK_DEFINITION_ARN} is not in family ${ECS_TASK_FAMILY}"
+              exit 1
+              ;;
+          esac
+
+          echo "arn=${TASK_DEFINITION_ARN}" >> "${GITHUB_OUTPUT}"
+          echo "Basing the new revision on ${TASK_DEFINITION_ARN}"
+
+      - name: Render a new revision changing only the container image
+        run: |
+          set -euo pipefail
+          aws ecs describe-task-definition \
+            --task-definition "${{ steps.current.outputs.arn }}" \
+            --query 'taskDefinition' \
+            --output json > raw-task-definition.json
+
+          # RegisterTaskDefinition rejects these server-managed fields.
+          jq 'del(
+                .taskDefinitionArn,
+                .revision,
+                .status,
+                .requiresAttributes,
+                .compatibilities,
+                .registeredAt,
+                .registeredBy,
+                .deregisteredAt
+              )' raw-task-definition.json > current-task-definition.json
+
+          jq --arg name "${CONTAINER_NAME}" --arg image "${{ steps.image.outputs.uri }}" \
+            '.containerDefinitions |= map(if .name == $name then .image = $image else . end)' \
+            current-task-definition.json > new-task-definition.json
+
+          MATCHES="$(jq --arg name "${CONTAINER_NAME}" \
+            '[.containerDefinitions[] | select(.name == $name)] | length' \
+            new-task-definition.json)"
+          if [ "${MATCHES}" != "1" ]; then
+            echo "::error::Expected exactly one container named ${CONTAINER_NAME}, found ${MATCHES}"
+            exit 1
+          fi
+
+      - name: Verify nothing but the image changed
+        run: |
+          set -euo pipefail
+          normalise() {
+            jq -S --arg name "${CONTAINER_NAME}" \
+              '.containerDefinitions |= map(if .name == $name then .image = "PINNED" else . end)' "$1"
+          }
+
+          if ! diff -q <(normalise current-task-definition.json) \
+                       <(normalise new-task-definition.json) > /dev/null; then
+            echo "::error::The rendered task definition differs beyond the ${CONTAINER_NAME} image"
+            exit 1
+          fi
+
+          echo "Environment, secrets, roles, networking, logging and sizing are unchanged."
+          jq -r '.containerDefinitions[] | "\(.name) -> \(.image)"' new-task-definition.json
+
+      - name: Register the new task definition revision
+        id: register
+        run: |
+          set -euo pipefail
+          NEW_TASK_DEFINITION_ARN="$(
+            aws ecs register-task-definition \
+              --cli-input-json file://new-task-definition.json \
+              --query 'taskDefinition.taskDefinitionArn' \
+              --output text
+          )"
+          echo "arn=${NEW_TASK_DEFINITION_ARN}" >> "${GITHUB_OUTPUT}"
+          echo "Registered ${NEW_TASK_DEFINITION_ARN}"
+
+      - name: Update the ECS service
+        run: |
+          set -euo pipefail
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --task-definition "${{ steps.register.outputs.arn }}" \
+            --query 'service.deployments[0].id' \
+            --output text
+
+      - name: Wait for the service to reach a steady state
+        run: |
+          set -euo pipefail
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}"
+
+      - name: Report deployment failure detail
+        if: failure()
+        run: |
+          aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --query 'services[0].{status:status,desired:desiredCount,running:runningCount,deployments:deployments[].{status:status,rollout:rolloutState,reason:rolloutStateReason,taskDefinition:taskDefinition}}' \
+            --output json || true
+          aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --query 'services[0].events[:10].message' \
+            --output json || true
+
+      - name: Summarise the deployment
+        if: success()
+        run: |
+          {
+            echo "### Backend deployed"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| Image | \`${{ steps.image.outputs.uri }}\` |"
+            echo "| Previous task definition | \`${{ steps.current.outputs.arn }}\` |"
+            echo "| New task definition | \`${{ steps.register.outputs.arn }}\` |"
+            echo "| Cluster | \`${ECS_CLUSTER}\` |"
+            echo "| Service | \`${ECS_SERVICE}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  deploy-frontend:
+    name: Build and deploy frontend to S3 and CloudFront
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      FRONTEND_BUCKET: oiap-frontend-543828674554
+      CLOUDFRONT_DISTRIBUTION_ID: E34DYZI9KL86U2
+      CLOUDFRONT_URL: https://d2d2u4ttuwfwlz.cloudfront.net
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::543828674554:role/oiap-github-actions-deploy-role
+          role-session-name: oiap-cd-frontend-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build the production bundle
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ env.CLOUDFRONT_URL }}
+        run: |
+          set -euo pipefail
+          npm run build
+
+      - name: Verify the build output
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          if [ ! -f dist/index.html ]; then
+            echo "::error::frontend/dist/index.html was not produced by the build"
+            exit 1
+          fi
+
+          # Vite inlines VITE_API_BASE_URL at build time. If it were missing the
+          # bundle would silently fall back to http://localhost:8000 and every
+          # browser request would fail without reaching AWS.
+          if ! grep -rq "${CLOUDFRONT_URL}" dist; then
+            echo "::error::${CLOUDFRONT_URL} was not inlined into the bundle"
+            exit 1
+          fi
+
+          echo "Build output:"
+          ls -1 dist
+
+      - name: Deploy the bundle to S3
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          aws s3 sync dist "s3://${FRONTEND_BUCKET}" --delete
+
+      - name: Invalidate the CloudFront distribution
+        id: invalidation
+        run: |
+          set -euo pipefail
+          INVALIDATION_ID="$(
+            aws cloudfront create-invalidation \
+              --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+              --paths '/*' \
+              --query 'Invalidation.Id' \
+              --output text
+          )"
+          echo "id=${INVALIDATION_ID}" >> "${GITHUB_OUTPUT}"
+          echo "Created invalidation ${INVALIDATION_ID}"
+
+      - name: Summarise the frontend deployment
+        if: success()
+        run: |
+          {
+            echo "### Frontend deployed"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| S3 bucket | \`${FRONTEND_BUCKET}\` |"
+            echo "| CloudFront distribution | \`${CLOUDFRONT_DISTRIBUTION_ID}\` |"
+            echo "| Public URL | ${CLOUDFRONT_URL} |"
+            echo "| Invalidation | \`${{ steps.invalidation.outputs.id }}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -1,0 +1,364 @@
+:root {
+  --surface: #ffffff;
+  --surface-muted: #f5f6f8;
+  --border: #d8dce3;
+  --text: #1b1f26;
+  --text-muted: #5b6472;
+  --accent: #1f4f8b;
+  --accent-contrast: #ffffff;
+  --caution-surface: #fdf6e3;
+  --caution-border: #e0c98a;
+  --error-surface: #fdf1f0;
+  --error-border: #dda9a4;
+  --radius: 8px;
+
+  color-scheme: light;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.55;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0 auto;
+  max-width: 46rem;
+  padding: 2rem 1rem 1.5rem;
+}
+
+.page__header {
+  flex: 0 0 auto;
+  margin-bottom: 1.5rem;
+}
+
+.page__title {
+  font-size: 1.6rem;
+  margin: 0 0 0.25rem;
+}
+
+.page__subtitle {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1rem;
+  /* Without this a flex child refuses to shrink below its content height, and
+     the transcript would push the page instead of scrolling inside itself. */
+  min-height: 0;
+}
+
+.chat__transcript {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 4rem;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.chat__empty {
+  color: var(--text-muted);
+  margin: 0;
+  padding: 1.5rem 0.25rem;
+}
+
+.page__footer {
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+
+.composer,
+.message--assistant {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.composer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.composer__label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.composer__row {
+  align-items: flex-end;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.composer__input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: inherit;
+  flex: 1 1 auto;
+  font: inherit;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  resize: vertical;
+}
+
+.composer__input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.composer__input:disabled {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.composer__send {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--accent-contrast);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.2rem;
+}
+
+.composer__send:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.composer__hint {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.notice {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0;
+  padding: 0.9rem 1rem;
+}
+
+.message--pending {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  margin: 0;
+  padding: 0.9rem 1rem;
+}
+
+.notice--error {
+  background: var(--error-surface);
+  border-color: var(--error-border);
+}
+
+.notice__message {
+  margin: 0;
+}
+
+.notice__reference {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0;
+  word-break: break-all;
+}
+
+.message__header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.message__role {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.message__text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.message__note {
+  background: var(--caution-surface);
+  border: 1px solid var(--caution-border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0.9rem 0 0;
+  padding: 0.75rem 0.9rem;
+}
+
+.badge {
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.7rem;
+  white-space: nowrap;
+}
+
+.badge--caution {
+  background: var(--caution-surface);
+  color: #6d5312;
+}
+
+.citations {
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+}
+
+.citations__summary {
+  align-items: center;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 600;
+  gap: 0.4rem;
+  list-style: none;
+  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+  user-select: none;
+  width: fit-content;
+}
+
+/* Replace the native disclosure triangle with a chevron that rotates. */
+.citations__summary::-webkit-details-marker {
+  display: none;
+}
+
+.citations__summary::before {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  content: "";
+  height: 0.4rem;
+  margin-left: 0.25rem;
+  transform: rotate(45deg);
+  transform-origin: center;
+  width: 0.4rem;
+}
+
+.citations[open] .citations__summary::before {
+  transform: rotate(-135deg);
+}
+
+.citations__summary:hover {
+  color: var(--text);
+}
+
+.citations__summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.citations__count {
+  background: var(--surface-muted);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.05rem 0.4rem;
+}
+
+.citations__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.citation {
+  display: flex;
+}
+
+.citation__body {
+  min-width: 0;
+}
+
+.citation__title {
+  font-weight: 600;
+  margin: 0;
+}
+
+.citation__heading-path,
+.citation__key {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.citation__key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 30rem) {
+  .page {
+    padding: 1.25rem 0.75rem 2rem;
+  }
+
+  .composer__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .composer__send {
+    text-align: center;
+  }
+}
+
+.message--user {
+  background: #eef2f7;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-left: auto;
+  max-width: 85%;
+  padding: 0.8rem 1rem;
+}
+
+.message--assistant {
+  max-width: 100%;
+}
+
+.message--user .message__role {
+  color: var(--accent);
+}
