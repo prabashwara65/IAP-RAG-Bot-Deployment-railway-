@@ -1,10 +1,11 @@
 """Integration tests for the HR grounded answer endpoint.
 
 Every test injects deterministic collaborators through FastAPI dependency
-overrides. No test requires an OpenAI API key, network access, or a database.
+overrides. No test requires a Gemini API key, network access, or a database.
 """
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import Mock
 from uuid import uuid4
@@ -15,6 +16,7 @@ from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy.exc import OperationalError
 
 from app.api.dependencies import (
+    get_current_user,
     get_embedding_provider,
     get_embedding_repository,
     get_llm_provider,
@@ -25,11 +27,12 @@ from app.api.routes.hr_rag import (
     EVIDENCE_STORE_MESSAGE,
 )
 from app.core.config import Settings
+from app.domain.accounts import UserAccount
 from app.domain.retrieval import SemanticSearchRecord
 from app.main import create_app
-from app.providers.openai_embeddings import (
-    OpenAIEmbeddingError,
-    OpenAIEmbeddingErrorCode,
+from app.providers.gemini_embeddings import (
+    GeminiEmbeddingError,
+    GeminiEmbeddingErrorCode,
 )
 from app.repositories.embeddings import EmbeddingRepository
 from app.schemas.hr_rag import MAX_QUESTION_LENGTH
@@ -113,6 +116,17 @@ def _repository(
     return repository
 
 
+def _signed_in_user() -> UserAccount:
+    return UserAccount(
+        id=uuid4(),
+        email="tester@example.com",
+        display_name="Tester",
+        theme="system",
+        avatar_path=None,
+        created_at=datetime.now(UTC),
+    )
+
+
 def _application(
     *,
     embedding_provider: object | None = None,
@@ -125,7 +139,7 @@ def _application(
         settings
         or Settings(
             app_env="test",
-            openai_api_key=FAKE_API_KEY,  # type: ignore[arg-type]
+            gemini_api_key=FAKE_API_KEY,  # type: ignore[arg-type]
         )
     )
     if embedding_provider is not None:
@@ -136,6 +150,7 @@ def _application(
         application.dependency_overrides[get_llm_provider] = lambda: llm_provider
     if repository is not None:
         application.dependency_overrides[get_embedding_repository] = lambda: repository
+    application.dependency_overrides[get_current_user] = _signed_in_user
     return application
 
 
@@ -310,8 +325,8 @@ async def test_an_oversized_question_is_rejected() -> None:
 
 
 async def test_a_missing_credential_is_reported_as_unavailable() -> None:
-    settings = Settings(_env_file=None, app_env="test", openai_api_key=None)  # type: ignore[call-arg]
-    assert settings.openai_api_key is None
+    settings = Settings(_env_file=None, app_env="test", gemini_api_key=None)  # type: ignore[call-arg]
+    assert settings.gemini_api_key is None
     application = _application(settings=settings, repository=_repository((_record(),)))
 
     response = await _ask(application)
@@ -326,8 +341,8 @@ async def test_a_provider_request_failure_is_reported_as_a_bad_gateway() -> None
     leak_marker = "internal-provider-detail-that-must-not-leak"
     application = _application(
         embedding_provider=_StubEmbeddingProvider(
-            error=OpenAIEmbeddingError(
-                OpenAIEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
+            error=GeminiEmbeddingError(
+                GeminiEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
                 leak_marker,
             )
         ),
@@ -373,8 +388,8 @@ async def test_an_evidence_store_failure_is_reported_as_unavailable() -> None:
 async def test_no_credential_or_internal_detail_appears_in_any_error_body() -> None:
     application = _application(
         embedding_provider=_StubEmbeddingProvider(
-            error=OpenAIEmbeddingError(
-                OpenAIEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
+            error=GeminiEmbeddingError(
+                GeminiEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
                 FAKE_API_KEY,
             )
         ),
@@ -386,7 +401,7 @@ async def test_no_credential_or_internal_detail_appears_in_any_error_body() -> N
 
     assert FAKE_API_KEY not in response.text
     assert "Traceback" not in response.text
-    assert "openai" not in response.text.casefold()
+    assert "gemini" not in response.text.casefold()
     assert set(response.json()["error"]) == {"code", "message", "correlation_id"}
 
 

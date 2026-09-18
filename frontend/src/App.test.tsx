@@ -46,6 +46,14 @@ const INSUFFICIENT_ANSWER: HrAskResponse = {
   insufficient_evidence: true,
 };
 
+const TEST_USER = {
+  id: "11111111-1111-1111-1111-111111111111",
+  email: "ada@example.com",
+  display_name: "Ada Lovelace",
+  theme: "light" as const,
+  has_avatar: false,
+};
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -56,17 +64,40 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function routeFetch(url: string, ask: () => Response): Response {
+  if (url.includes("/api/v1/me/avatar")) {
+    return new Response(null, { status: 404 });
+  }
+  if (url.includes("/api/v1/me")) {
+    return jsonResponse(TEST_USER);
+  }
+  return ask();
+}
+
 /** Answer each successive request with the next body in the queue. */
 function mockSequence(...bodies: unknown[]): void {
   const queue = [...bodies];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => jsonResponse(queue.shift() ?? bodies[bodies.length - 1])),
+    vi.fn(async (input) =>
+      routeFetch(String(input), () =>
+        jsonResponse(queue.shift() ?? bodies[bodies.length - 1]),
+      ),
+    ),
   );
 }
 
 function mockStatus(body: unknown, status: number): void {
-  vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(body, status)));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input) =>
+      routeFetch(String(input), () => jsonResponse(body, status)),
+    ),
+  );
+}
+
+function hrAskCalls() {
+  return vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/hr/ask"));
 }
 
 function composer(): HTMLTextAreaElement {
@@ -83,6 +114,12 @@ async function ask(question: string): Promise<void> {
   await user.click(sendButton());
 }
 
+async function renderChat(): Promise<void> {
+  window.localStorage.setItem("oiap.access_token", "test-token");
+  render(<App />);
+  await screen.findByRole("button", { name: /send question/i });
+}
+
 beforeEach(() => {
   // jsdom does not implement scrollIntoView.
   Element.prototype.scrollIntoView = vi.fn();
@@ -94,8 +131,9 @@ afterEach(() => {
 });
 
 describe("conversation", () => {
-  it("shows the assistant header and no tenant field", () => {
-    render(<App />);
+  it("shows the assistant header and no tenant field", async () => {
+    mockSequence(LEAVE_ANSWER);
+    await renderChat();
 
     expect(
       screen.getByRole("heading", { name: "OIAP HR Assistant" }),
@@ -105,13 +143,15 @@ describe("conversation", () => {
 
   it("keeps the fixed synthetic tenant in the request body", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
-    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(init.body))).toEqual({
+    const askCall = vi.mocked(fetch).mock.calls.find(([url]) =>
+      String(url).includes("/hr/ask"),
+    ) as [string, RequestInit];
+    expect(JSON.parse(String(askCall[1].body))).toEqual({
       question: "How much leave?",
       tenant_id: "tenant-synthetic",
     });
@@ -119,7 +159,7 @@ describe("conversation", () => {
 
   it("shows the first user message and the first assistant response", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How many annual leave days do employees receive?");
 
@@ -131,7 +171,7 @@ describe("conversation", () => {
 
   it("keeps earlier turns visible when a second question is asked", async () => {
     mockSequence(LEAVE_ANSWER, REMOTE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
@@ -146,7 +186,7 @@ describe("conversation", () => {
 
   it("renders the transcript in chronological order", async () => {
     mockSequence(LEAVE_ANSWER, REMOTE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
@@ -167,7 +207,7 @@ describe("conversation", () => {
 
   it("renders each answer's citations under that answer", async () => {
     mockSequence(LEAVE_ANSWER, REMOTE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
@@ -191,7 +231,7 @@ describe("conversation", () => {
 describe("collapsible sources", () => {
   it("shows a collapsed Sources control when an answer has citations", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
@@ -204,7 +244,7 @@ describe("collapsible sources", () => {
 
   it("expands and collapses the citation list when Sources is clicked", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
@@ -221,7 +261,7 @@ describe("collapsible sources", () => {
 
   it("keeps every citation field inside the expanded control", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
@@ -241,7 +281,7 @@ describe("collapsible sources", () => {
 
   it("gives each assistant message its own Sources control", async () => {
     mockSequence(LEAVE_ANSWER, REMOTE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
@@ -260,7 +300,7 @@ describe("collapsible sources", () => {
 
   it("hides inline citation markers from the visible answer text", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -272,7 +312,7 @@ describe("collapsible sources", () => {
 
   it("keeps the raw answer, markers included, in the data model", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -285,7 +325,7 @@ describe("collapsible sources", () => {
 
   it("no longer shows the grounded badge on a successful answer", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -299,7 +339,7 @@ describe("collapsible sources", () => {
 describe("evidence and failures", () => {
   it("presents insufficient evidence as a normal outcome, not a failure", async () => {
     mockSequence(INSUFFICIENT_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("What is the visitor parking policy?");
 
@@ -314,7 +354,7 @@ describe("evidence and failures", () => {
 
   it("shows the dedicated rate-limit message for HTTP 429", async () => {
     mockStatus({ error: { code: "HTTP_429", message: "backend wording" } }, 429);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -329,7 +369,7 @@ describe("evidence and failures", () => {
 
   it("keeps the reference id on a rate-limit failure", async () => {
     mockStatus({ error: {} }, 429);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -338,7 +378,7 @@ describe("evidence and failures", () => {
 
   it("keeps the rate-limited question visible in the transcript", async () => {
     mockStatus({ error: {} }, 429);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -349,7 +389,7 @@ describe("evidence and failures", () => {
   it("still shows the generic message for an unexpected failure", async () => {
     const leakMarker = "internal-backend-detail";
     mockStatus({ error: { message: leakMarker, code: "HTTP_502" } }, 502);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -363,11 +403,18 @@ describe("evidence and failures", () => {
   it("shows a safe message when the backend is unreachable", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => {
+      vi.fn(async (input) => {
+        const url = String(input);
+        if (url.includes("/api/v1/me/avatar")) {
+          return new Response(null, { status: 404 });
+        }
+        if (url.includes("/api/v1/me")) {
+          return jsonResponse(TEST_USER);
+        }
         throw new TypeError("Failed to fetch");
       }),
     );
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -380,31 +427,31 @@ describe("evidence and failures", () => {
 describe("composer", () => {
   it("cannot send a blank or whitespace-only question", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     expect(sendButton()).toBeDisabled();
 
     const user = userEvent.setup();
     await user.type(composer(), "   ");
     expect(sendButton()).toBeDisabled();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(hrAskCalls()).toHaveLength(0);
   });
 
   it("sends on Enter", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     const user = userEvent.setup();
     await user.type(composer(), "How much leave?");
     await user.keyboard("{Enter}");
 
     expect(await screen.findByText(LEAVE_ANSWER_VISIBLE)).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(hrAskCalls()).toHaveLength(1);
   });
 
   it("inserts a newline on Shift+Enter without sending", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     const user = userEvent.setup();
     await user.type(composer(), "first line");
@@ -412,12 +459,12 @@ describe("composer", () => {
     await user.type(composer(), "second line");
 
     expect(composer().value).toBe("first line\nsecond line");
-    expect(fetch).not.toHaveBeenCalled();
+    expect(hrAskCalls()).toHaveLength(0);
   });
 
   it("clears the composer after a question is sent", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -432,12 +479,19 @@ describe("composer", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => {
+      vi.fn(async (input) => {
+        const url = String(input);
+        if (url.includes("/api/v1/me/avatar")) {
+          return new Response(null, { status: 404 });
+        }
+        if (url.includes("/api/v1/me")) {
+          return jsonResponse(TEST_USER);
+        }
         await pending;
         return jsonResponse(LEAVE_ANSWER);
       }),
     );
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
@@ -451,16 +505,77 @@ describe("composer", () => {
     await waitFor(() => {
       expect(screen.getByText(LEAVE_ANSWER_VISIBLE)).toBeInTheDocument();
     });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(hrAskCalls()).toHaveLength(1);
   });
 
   it("scrolls to the newest message", async () => {
     mockSequence(LEAVE_ANSWER);
-    render(<App />);
+    await renderChat();
 
     await ask("How much leave?");
 
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+});
+
+describe("authentication", () => {
+  it("shows signup when there is no session", async () => {
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /send verification code/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/work email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/your hr question/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the demo OTP after signup", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          otp_sent: true,
+          email: "ada@example.com",
+          expires_in_seconds: 600,
+          otp_code: "123456",
+          delivery: "on_screen",
+        }),
+      ),
+    );
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/display name/i), "Ada");
+    await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
+    await user.type(screen.getByLabelText(/^password$/i), "password12");
+    await user.click(screen.getByRole("button", { name: /send verification code/i }));
+
+    expect(await screen.findByText("123456")).toBeInTheDocument();
+    expect(screen.getByText(/your verification code/i)).toBeInTheDocument();
+  });
+
+  it("asks the user to check Gmail when SMTP delivered the OTP", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          otp_sent: true,
+          email: "ada@example.com",
+          expires_in_seconds: 600,
+          otp_code: null,
+          delivery: "email",
+        }),
+      ),
+    );
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/display name/i), "Ada");
+    await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
+    await user.type(screen.getByLabelText(/^password$/i), "password12");
+    await user.click(screen.getByRole("button", { name: /send verification code/i }));
+
+    expect(await screen.findByText(/check gmail/i)).toBeInTheDocument();
+    expect(screen.queryByText("123456")).not.toBeInTheDocument();
   });
 });

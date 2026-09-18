@@ -19,9 +19,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import Settings
 from app.core.logging import configure_logging
-from app.providers.openai_embeddings import (
-    OpenAIEmbeddingError,
-    OpenAIEmbeddingErrorCode,
+from app.providers.gemini_embeddings import (
+    GeminiEmbeddingError,
+    GeminiEmbeddingErrorCode,
 )
 from app.seed_synthetic_hr import (
     EXIT_CONFIGURATION_ERROR,
@@ -38,7 +38,7 @@ FAKE_API_KEY = "sk-test-not-a-real-key-0123456789"
 # What the provider wrapper produces for a rejected key: the SDK exception type
 # only, never its message.
 AUTHENTICATION_FAILURE_MESSAGE = (
-    "The OpenAI embedding request failed: AuthenticationError."
+    "The Gemini embedding request failed: ClientError."
 )
 
 
@@ -83,7 +83,7 @@ def _run_main(
     monkeypatch: pytest.MonkeyPatch,
     *,
     seed: Callable[..., int],
-    provider_error: OpenAIEmbeddingError | None = None,
+    provider_error: GeminiEmbeddingError | None = None,
 ) -> _SeedRun:
     """Run ``main()`` with every collaborator replaced but its logic intact."""
     stream = StringIO()
@@ -105,7 +105,7 @@ def _run_main(
         return object()
 
     monkeypatch.setattr(
-        "app.seed_synthetic_hr.openai_embedding_provider_from_settings", _provider
+        "app.seed_synthetic_hr.gemini_embedding_provider_from_settings", _provider
     )
     monkeypatch.setattr(
         "app.seed_synthetic_hr.create_database_engine", lambda _settings: engine
@@ -145,15 +145,15 @@ def _succeed(count: int = 4) -> Callable[..., int]:
     return _seed
 
 
-def test_an_openai_failure_logs_the_stable_code_and_wrapper_message(
+def test_a_gemini_failure_logs_the_stable_code_and_wrapper_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The exact regression: the ECS log said only the exception class name."""
     run = _run_main(
         monkeypatch,
         seed=_raise(
-            OpenAIEmbeddingError(
-                OpenAIEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
+            GeminiEmbeddingError(
+                GeminiEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
                 AUTHENTICATION_FAILURE_MESSAGE,
             )
         ),
@@ -164,41 +164,41 @@ def test_an_openai_failure_logs_the_stable_code_and_wrapper_message(
     message = run.error_messages[0]
     assert "provider_request_failed" in message
     assert AUTHENTICATION_FAILURE_MESSAGE in message
-    assert "AuthenticationError" in message
+    assert "ClientError" in message
     assert "rolled back" in message
     # The old line carried the wrapper class name and nothing actionable.
-    assert message != "Synthetic HR seed failed [OpenAIEmbeddingError]; rolled back"
+    assert message != "Synthetic HR seed failed [GeminiEmbeddingError]; rolled back"
 
 
 @pytest.mark.parametrize(
     "code",
     [
-        OpenAIEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
-        OpenAIEmbeddingErrorCode.PROVIDER_DIMENSION_MISMATCH,
-        OpenAIEmbeddingErrorCode.INVALID_PROVIDER_RESPONSE,
+        GeminiEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
+        GeminiEmbeddingErrorCode.PROVIDER_DIMENSION_MISMATCH,
+        GeminiEmbeddingErrorCode.INVALID_PROVIDER_RESPONSE,
     ],
 )
 def test_every_embedding_failure_code_reaches_the_log(
     monkeypatch: pytest.MonkeyPatch,
-    code: OpenAIEmbeddingErrorCode,
+    code: GeminiEmbeddingErrorCode,
 ) -> None:
     run = _run_main(
-        monkeypatch, seed=_raise(OpenAIEmbeddingError(code, "sanitized detail"))
+        monkeypatch, seed=_raise(GeminiEmbeddingError(code, "sanitized detail"))
     )
 
     assert run.exit_code == EXIT_FAILURE
     assert code.value in run.error_messages[0]
 
 
-def test_an_openai_failure_never_logs_credential_material(
+def test_a_gemini_failure_never_logs_credential_material(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A provider message is only logged because the wrapper sanitizes it."""
     run = _run_main(
         monkeypatch,
         seed=_raise(
-            OpenAIEmbeddingError(
-                OpenAIEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
+            GeminiEmbeddingError(
+                GeminiEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
                 AUTHENTICATION_FAILURE_MESSAGE,
             )
         ),
@@ -210,14 +210,14 @@ def test_an_openai_failure_never_logs_credential_material(
     assert "api_key" not in run.output
 
 
-def test_an_openai_failure_rolls_back_and_disposes_the_engine(
+def test_a_gemini_failure_rolls_back_and_disposes_the_engine(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _run_main(
         monkeypatch,
         seed=_raise(
-            OpenAIEmbeddingError(
-                OpenAIEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
+            GeminiEmbeddingError(
+                GeminiEmbeddingErrorCode.PROVIDER_REQUEST_FAILED,
                 AUTHENTICATION_FAILURE_MESSAGE,
             )
         ),
@@ -259,9 +259,9 @@ def test_a_missing_credential_is_reported_before_any_database_work(
     run = _run_main(
         monkeypatch,
         seed=_succeed(),
-        provider_error=OpenAIEmbeddingError(
-            OpenAIEmbeddingErrorCode.MISSING_API_KEY,
-            "OPENAI_API_KEY is not configured.",
+        provider_error=GeminiEmbeddingError(
+            GeminiEmbeddingErrorCode.MISSING_API_KEY,
+            "GEMINI_API_KEY is not configured.",
         ),
     )
 

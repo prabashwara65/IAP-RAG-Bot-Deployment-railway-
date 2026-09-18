@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.dependencies import (
+    get_current_user,
     get_embedding_provider,
     get_embedding_repository,
     get_llm_provider,
@@ -20,12 +21,12 @@ from app.api.dependencies import (
 from app.core.logging import get_logger
 from app.core.rate_limit import enforce_rate_limit
 from app.providers.embeddings import EmbeddingProvider
-from app.providers.llm import LLMProvider
-from app.providers.openai_embeddings import (
-    OpenAIEmbeddingError,
-    OpenAIEmbeddingErrorCode,
+from app.providers.gemini_embeddings import (
+    GeminiEmbeddingError,
+    GeminiEmbeddingErrorCode,
 )
-from app.providers.openai_llm import OpenAILLMError, OpenAILLMErrorCode
+from app.providers.gemini_llm import GeminiLLMError, GeminiLLMErrorCode
+from app.providers.llm import LLMProvider
 from app.repositories.embeddings import EmbeddingRepository
 from app.schemas.hr_rag import HRAskRequest, HRAskResponse
 from app.services.hr_rag import HRRAGError, HRRAGErrorCode, answer_hr_question
@@ -55,10 +56,10 @@ _SERVER_RAG_CODES = frozenset(
 )
 _PROVIDER_CONFIGURATION_CODES = frozenset(
     {
-        OpenAIEmbeddingErrorCode.MISSING_API_KEY.value,
-        OpenAIEmbeddingErrorCode.MISSING_MODEL.value,
-        OpenAILLMErrorCode.MISSING_API_KEY.value,
-        OpenAILLMErrorCode.MISSING_MODEL.value,
+        GeminiEmbeddingErrorCode.MISSING_API_KEY.value,
+        GeminiEmbeddingErrorCode.MISSING_MODEL.value,
+        GeminiLLMErrorCode.MISSING_API_KEY.value,
+        GeminiLLMErrorCode.MISSING_MODEL.value,
     }
 )
 
@@ -87,7 +88,7 @@ def _fail(
     "/ask",
     response_model=HRAskResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(enforce_rate_limit)],
+    dependencies=[Depends(enforce_rate_limit), Depends(get_current_user)],
 )
 def ask_hr_question(
     payload: HRAskRequest,
@@ -147,7 +148,7 @@ def ask_hr_question(
             failure_code=error.code.value,
             error=error,
         )
-    except (OpenAIEmbeddingError, OpenAILLMError) as error:
+    except (GeminiEmbeddingError, GeminiLLMError) as error:
         if error.code.value in _PROVIDER_CONFIGURATION_CODES:
             _fail(
                 status.HTTP_503_SERVICE_UNAVAILABLE,

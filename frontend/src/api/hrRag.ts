@@ -6,7 +6,8 @@
  * rather than as a silent runtime mismatch in a component.
  */
 
-const DEFAULT_API_BASE_URL = "http://localhost:8000";
+import { jsonHeaders } from "./http";
+
 const ASK_PATH = "/api/v1/hr/ask";
 const REQUEST_TIMEOUT_MS = 60_000;
 
@@ -47,6 +48,7 @@ export type HrAskFailureKind =
   | "invalid_request"
   | "rate_limited"
   | "unavailable"
+  | "unauthenticated"
   | "upstream"
   | "unexpected";
 
@@ -63,7 +65,7 @@ export class HrAskError extends Error {
 }
 
 function apiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+  const configured = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
   return configured.replace(/\/+$/, "");
 }
 
@@ -73,6 +75,9 @@ function failureKindForStatus(status: number): HrAskFailureKind {
   }
   if (status === 429) {
     return "rate_limited";
+  }
+  if (status === 401) {
+    return "unauthenticated";
   }
   if (status === 503) {
     return "unavailable";
@@ -125,7 +130,7 @@ export async function askHrQuestion(
   try {
     response = await fetch(`${apiBaseUrl()}${ASK_PATH}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: jsonHeaders(),
       body: JSON.stringify(request),
       signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });

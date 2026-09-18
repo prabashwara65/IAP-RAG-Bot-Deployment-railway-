@@ -34,9 +34,9 @@ from app.evaluation.corpus import load_hr_evaluation_corpus
 from app.evaluation.hr_cases import HR_EVALUATION_DOCUMENTS
 from app.models.documents import DocumentModel
 from app.providers.embeddings import EmbeddingProvider
-from app.providers.openai_embeddings import (
-    OpenAIEmbeddingError,
-    openai_embedding_provider_from_settings,
+from app.providers.gemini_embeddings import (
+    GeminiEmbeddingError,
+    gemini_embedding_provider_from_settings,
 )
 
 SYNTHETIC_TENANT_ID = "tenant-synthetic"
@@ -150,8 +150,8 @@ def main() -> int:
     logger.info(f"Synthetic HR seed started (tenant={SYNTHETIC_TENANT_ID})")
 
     try:
-        embedding_provider = openai_embedding_provider_from_settings(settings)
-    except OpenAIEmbeddingError as error:
+        embedding_provider = gemini_embedding_provider_from_settings(settings)
+    except GeminiEmbeddingError as error:
         # Only the stable failure code is reported; the credential and the
         # provider message never reach the log.
         logger.error(f"Embedding provider unavailable [{error.code.value}]")
@@ -165,11 +165,11 @@ def main() -> int:
         # Raised before any write, and ``session_scope`` rolled back regardless.
         logger.error(f"Synthetic HR seed refused: {error}")
         return EXIT_INCONSISTENT_STATE
-    except OpenAIEmbeddingError as error:
+    except GeminiEmbeddingError as error:
         # ``session_scope`` has already rolled the transaction back.
         #
         # ``str(error)`` is the embedding provider's own wrapper message. Every
-        # branch in ``app.providers.openai_embeddings`` builds that message from
+        # branch in ``app.providers.gemini_embeddings`` builds that message from
         # a fixed string, a count, or ``type(sdk_error).__name__`` alone, and
         # never interpolates the SDK message, request headers, response body, or
         # the credential. Logging the stable code alongside it turns an opaque

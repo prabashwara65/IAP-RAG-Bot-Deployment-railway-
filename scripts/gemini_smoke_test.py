@@ -1,28 +1,28 @@
-"""Manual OpenAI connectivity check.
+"""Manual Gemini connectivity check.
 
 This script performs one real, tiny API call and is never run by pytest. It
 exists so a developer can verify credentials and model access without adding a
 production endpoint.
 
 Usage:
-    OPENAI_API_KEY=... OPENAI_MODEL=gpt-5-mini python -m scripts.openai_smoke_test
+    GEMINI_API_KEY=... GEMINI_MODEL=gemini-2.5-flash python -m scripts.gemini_smoke_test
 """
 
 from __future__ import annotations
 
 from app.core.config import get_settings
-from app.providers.openai_llm import OpenAILLMError, openai_llm_provider_from_settings
+from app.providers.gemini_llm import GeminiLLMError, gemini_llm_provider_from_settings
 
-EXPECTED_ANSWER = "OIAP_OPENAI_OK"
-SMOKE_SYSTEM_PROMPT = "You are a test assistant. Reply with exactly: OIAP_OPENAI_OK"
+EXPECTED_ANSWER = "OIAP_GEMINI_OK"
+SMOKE_SYSTEM_PROMPT = "You are a test assistant. Reply with exactly: OIAP_GEMINI_OK"
 SMOKE_USER_PROMPT = "Run the smoke test."
 
 
 def main() -> int:
     """Send one minimal prompt and report whether the expected reply came back."""
     try:
-        provider = openai_llm_provider_from_settings(get_settings())
-    except OpenAILLMError as error:
+        provider = gemini_llm_provider_from_settings(get_settings())
+    except GeminiLLMError as error:
         print(f"CONFIGURATION FAILED [{error.code.value}]: {error}")
         return 2
 
@@ -32,7 +32,7 @@ def main() -> int:
             system_prompt=SMOKE_SYSTEM_PROMPT,
             user_prompt=SMOKE_USER_PROMPT,
         )
-    except OpenAILLMError as error:
+    except GeminiLLMError as error:
         print(f"REQUEST FAILED [{error.code.value}]: {error}")
         return 1
 

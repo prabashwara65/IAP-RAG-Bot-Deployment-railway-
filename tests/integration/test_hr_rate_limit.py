@@ -7,6 +7,7 @@ application and starts from a clean set of windows.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -14,12 +15,14 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 
 from app.api.dependencies import (
+    get_current_user,
     get_embedding_provider,
     get_embedding_repository,
     get_llm_provider,
 )
 from app.core.config import Settings
 from app.core.rate_limit import RATE_LIMITED_MESSAGE, RETRY_AFTER_HEADER
+from app.domain.accounts import UserAccount
 from app.domain.retrieval import SemanticSearchRecord
 from app.main import create_app
 from app.repositories.embeddings import EmbeddingRepository
@@ -88,7 +91,7 @@ def _application(*, max_requests: int = 5) -> FastAPI:
     application = create_app(
         Settings(
             app_env="test",
-            openai_api_key=FAKE_API_KEY,  # type: ignore[arg-type]
+            gemini_api_key=FAKE_API_KEY,  # type: ignore[arg-type]
             rate_limit_requests=max_requests,
             rate_limit_window_seconds=60,
             rate_limit_trusted_proxy_hops=1,
@@ -97,6 +100,14 @@ def _application(*, max_requests: int = 5) -> FastAPI:
     application.dependency_overrides[get_embedding_provider] = _StubEmbeddingProvider
     application.dependency_overrides[get_llm_provider] = _StubLLMProvider
     application.dependency_overrides[get_embedding_repository] = lambda: repository
+    application.dependency_overrides[get_current_user] = lambda: UserAccount(
+        id=uuid4(),
+        email="tester@example.com",
+        display_name="Tester",
+        theme="system",
+        avatar_path=None,
+        created_at=datetime.now(UTC),
+    )
     return application
 
 

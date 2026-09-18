@@ -21,6 +21,8 @@ const FAILURE_MESSAGES: Record<HrAskFailureKind, string> = {
     "Rate limit reached — maximum 5 questions per minute. Please wait and try again shortly.",
   unavailable:
     "The HR assistant is temporarily unavailable. Please try again in a few minutes.",
+  unauthenticated:
+    "Your session has ended. Sign in again to keep asking questions.",
   upstream:
     "The HR assistant could not produce a grounded answer this time. Please try again.",
   unexpected: "Something went wrong while answering. Please try again.",

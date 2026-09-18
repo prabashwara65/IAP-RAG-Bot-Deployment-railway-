@@ -20,3 +20,7 @@ strict = true
 pretty = true
 show_error_codes = true
 warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["google.*"]
+ignore_missing_imports = true

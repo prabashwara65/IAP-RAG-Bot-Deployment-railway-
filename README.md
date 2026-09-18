@@ -19,15 +19,16 @@ person in the decision loop rather than acting autonomously.
 **Current status: a deployed portfolio demo running on AWS.** The assistant is
 publicly reachable through CloudFront and answers real questions against a
 synthetic HR corpus. It is a demonstration system, not an enterprise product:
-there is no authentication, no authorisation, and the HR content is synthetic
-throughout. See [Current Limitations](#current-limitations) for the full list —
-that section is deliberately specific rather than reassuring.
+signup uses email and password, login adds a Gmail OTP as 2FA, there is still
+no authorisation, and the HR content is synthetic throughout. See
+[Current Limitations](#current-limitations) for the full list — that section is
+deliberately specific rather than reassuring.
 
 ## Current Milestone
 
 **Deployed public demo on AWS.** The conversational HR assistant runs end to end
 on deployed AWS infrastructure, served from CloudFront and backed by ECS Fargate,
-RDS PostgreSQL with pgvector, and the OpenAI APIs. Deployment is automated:
+RDS PostgreSQL with pgvector, and the Gemini APIs. Deployment is automated:
 merging to `main` builds and ships both the backend image and the frontend
 bundle through GitHub Actions.
 
@@ -37,9 +38,9 @@ The grounded answer flow behind it:
 User
   -> React chat UI
     -> FastAPI
-      -> query embedding (OpenAI)
+      -> query embedding (Gemini)
         -> pgvector semantic retrieval (PostgreSQL)
-          -> grounded LLM answer (OpenAI)
+          -> grounded LLM answer (Gemini)
             -> validated citation(s) shown under the answer
 ```
 
@@ -105,8 +106,8 @@ Only features that exist in this repository are listed here.
 - Document lifecycle foundation: documents, versions, chunks, embedding sets,
   and embeddings, with candidate/approved/active/superseded states and
   repository-controlled transitions.
-- Vendor-neutral embedding and LLM provider protocols, with an OpenAI embedding
-  provider, an OpenAI LLM provider (Responses API), and deterministic
+- Vendor-neutral embedding and LLM provider protocols, with a Gemini embedding
+  provider, a Gemini LLM provider, and deterministic
   test-only implementations behind the same interfaces.
 - Semantic retrieval over pgvector using cosine distance, filtered by tenant,
   active document version, active embedding set, model, and dimension, with
@@ -159,7 +160,7 @@ removed from the data model or from the grounding checks.
 - Deterministic unit and integration test suites, with database integration
   tests running against real PostgreSQL and pgvector rather than a substitute.
 - Frontend tests with Vitest and Testing Library.
-- Manual smoke scripts for the OpenAI LLM and embedding providers, and a
+- Manual smoke scripts for the Gemini LLM and embedding providers, and a
   manual evaluation runner.
 
 ### Engineering and Safety
@@ -197,8 +198,8 @@ React/Vite frontend
   HR RAG service
    |          |
    v          v
-OpenAI     PostgreSQL
-LLM        + pgvector
+  Gemini   PostgreSQL
+   LLM     + pgvector
              |
              v
        approved synthetic
@@ -231,7 +232,7 @@ CloudFront  (single public entry point, HTTPS)
                                |
               +----------------+----------------+
               v                                 v
-     RDS PostgreSQL + pgvector            OpenAI API
+     RDS PostgreSQL + pgvector            Gemini API
                                    (generation and embeddings)
 ```
 
@@ -295,7 +296,7 @@ synthetic** HR corpus:
 
 No evaluation results are committed to this repository. Numbers are produced by
 running the harness locally, against either the deterministic providers or the
-real OpenAI providers.
+real Gemini providers.
 
 Any result produced this way is a **synthetic evaluation baseline** only. It
 measures behaviour on twelve authored questions over four authored documents.
@@ -308,7 +309,7 @@ It is not a measure of production accuracy, and it should not be read as one.
 | Language and runtime | Python 3.12 |
 | API | FastAPI, Uvicorn, Pydantic, Pydantic Settings |
 | Data | PostgreSQL, pgvector, SQLAlchemy 2.0, Psycopg 3, Alembic |
-| AI providers | OpenAI API — Responses API for generation, Embeddings API for vectors |
+| AI providers | Gemini API — generate content for answers, embeddings for vectors |
 | Frontend | React, TypeScript, Vite |
 | Backend quality | Pytest, Ruff, MyPy |
 | Frontend quality | Vitest, Testing Library, oxlint, TypeScript project builds |
@@ -351,7 +352,7 @@ cp .env.example .env
 
 Edit `.env` for local development: set `DB_HOST`, `DB_PORT`, `DB_NAME`,
 `DB_USER`, and `DB_PASSWORD` for your local database and, if you intend to use
-the real providers, set `OPENAI_API_KEY`. Never commit `.env`.
+the real providers, set `GEMINI_API_KEY`. Never commit `.env`.
 
 ### Frontend
 
@@ -508,13 +509,19 @@ fail with a clear error.
 | `DB_PASSWORD` | local placeholder | Database password; handled as a secret |
 | `DATABASE_POOL_SIZE` | `5` | Connection pool size, 1–50 |
 | `DATABASE_CONNECT_TIMEOUT_SECONDS` | `5` | Connection timeout in seconds, 1–60 |
-| `EMBEDDING_DIMENSION` | `1536` | Embedding dimension enforced against each embedding set |
+| `EMBEDDING_DIMENSION` | `768` | Embedding dimension enforced against each embedding set |
 | `RATE_LIMIT_REQUESTS` | `5` | Requests allowed per client per window on `/hr/ask`, 1–10000 |
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate-limit window length in seconds, 1–3600 |
 | `RATE_LIMIT_TRUSTED_PROXY_HOPS` | `1` | Proxies appending to `X-Forwarded-For` in front of the app (CloudFront + ALB = 1) |
-| `OPENAI_API_KEY` | unset | Required only for the real OpenAI providers; handled as a secret |
-| `OPENAI_MODEL` | `gpt-5-mini` | Model used for grounded generation |
-| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Model used for embeddings |
+| `GEMINI_API_KEY` | unset | Required only for the real Gemini providers; handled as a secret |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Model used for grounded generation |
+| `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` | Model used for embeddings |
+| `SMTP_HOST` | `smtp.gmail.com` | Gmail SMTP host for OTP mail |
+| `SMTP_PORT` | `587` | Gmail submission port |
+| `SMTP_USE_TLS` | `true` | STARTTLS before login |
+| `SMTP_USERNAME` | unset | Gmail address used to authenticate SMTP |
+| `SMTP_PASSWORD` | unset | Gmail App Password; handled as a secret |
+| `SMTP_FROM` | unset | From address on OTP messages; defaults to `SMTP_USERNAME` |
 
 Frontend configuration:
 
@@ -527,13 +534,17 @@ The application builds the `postgresql+psycopg://` SQLAlchemy URL from the five
 lets a deployment inject `DB_USER` and `DB_PASSWORD` straight from a managed
 secret without assembling a URL by hand.
 
-**`OPENAI_API_KEY` must never be committed.** It is supplied through the
-environment and is held as a secret value in configuration. `.env.example`
-contains placeholders only; `.env` is ignored by Git and must stay that way.
+**`GEMINI_API_KEY` and `SMTP_PASSWORD` must never be committed.** They are
+supplied through the environment and held as secret values in configuration.
+`.env.example` contains placeholders only; `.env` is ignored by Git and must
+stay that way. Gmail SMTP needs a Google App Password, not the account
+password. When SMTP credentials are present, signup and login email the OTP and
+the API does not return the code. When they are absent and `APP_ENV` is
+`development` or `test`, the code is returned so local work can continue.
 
-Note: `.env.example` also lists `OPENAI_MAX_OUTPUT_TOKENS`, and
+Note: `.env.example` also lists `GEMINI_MAX_OUTPUT_TOKENS`, and
 `TEST_DATABASE_URL` is read directly by the database test fixtures.
-`OPENAI_MAX_OUTPUT_TOKENS` is **not** currently read by application settings,
+`GEMINI_MAX_OUTPUT_TOKENS` is **not** currently read by application settings,
 so setting it has no effect; it is a known cleanup item rather than active
 configuration.
 
@@ -542,8 +553,10 @@ configuration.
 This section is intentionally direct. OIAP is a deployed **demonstration**, not
 an enterprise production system, and the list below is the honest reason why.
 
-- **No authentication.** There is no login, token, session, or API key check on
-  any endpoint.
+- **Demonstration-grade authentication.** Signup is email plus password. Login
+  checks the password, then emails a Gmail OTP as 2FA. Sessions are bearer
+  tokens on `/hr/ask` and profile routes. This is not SSO, not hardware 2FA,
+  and not an enterprise identity provider.
 - **`tenant_id` is request-supplied.** The caller states which tenant's content
   to search, and nothing verifies that claim.
 - **No production tenant enforcement.** Tenant isolation is a query filter, not
@@ -553,9 +566,9 @@ an enterprise production system, and the list below is the honest reason why.
   tasks permit N times that rate and every deployment resets the windows. It is
   a cost control against casual abuse and runaway clients, not a distributed
   production limiter; that needs shared storage or an edge WAF rate rule. There
-  is still no spend quota on the OpenAI account itself.
+  is still no spend quota on the Gemini account itself.
 - **No authorisation.** There are no roles, permissions, or per-document access
-  rules. Any caller who can reach the endpoint can query the whole corpus.
+  rules. Any signed-in account can query the whole synthetic corpus.
 - **Conversation lives in the browser only.** The transcript is React state for
   the current session. It is lost on refresh, is not stored server-side, and is
   never sent back to the API — each question is answered independently, with no
@@ -591,7 +604,7 @@ Planned, without committed dates:
 
 6. Frontend CI job covering lint and unit tests.
 7. Authentication and enforced tenant isolation.
-8. Shared or edge-level rate limiting, plus an OpenAI spend quota.
+8. Shared or edge-level rate limiting, plus a Gemini spend quota.
 9. LangGraph orchestration.
 10. MCP integration.
 11. Human-in-the-loop approval workflows.

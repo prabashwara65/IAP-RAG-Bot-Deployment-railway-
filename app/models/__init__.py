@@ -10,6 +10,7 @@ from app.models.documents import (
     EmbeddingModel,
     EmbeddingSetModel,
 )
+from app.models.users import OtpChallengeModel, SessionModel, UserModel
 
 __all__ = [
     "ApprovalDecisionModel",
@@ -20,4 +21,7 @@ __all__ = [
     "DocumentVersionModel",
     "EmbeddingModel",
     "EmbeddingSetModel",
+    "OtpChallengeModel",
+    "SessionModel",
+    "UserModel",
 ]

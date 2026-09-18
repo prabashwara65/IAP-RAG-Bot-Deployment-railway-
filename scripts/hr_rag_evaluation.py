@@ -1,11 +1,11 @@
-"""Manual HR RAG evaluation against the real OpenAI models.
+"""Manual HR RAG evaluation against the real Gemini models.
 
 This script is never run by pytest. It seeds the synthetic evaluation corpus
 into the disposable test database, measures the existing retrieval and grounded
 answer services, prints the summary, and then rolls back so no rows remain.
 
 Requires:
-    OPENAI_API_KEY      real credential, read from the environment or .env
+    GEMINI_API_KEY      real credential, read from the environment or .env
     TEST_DATABASE_URL   disposable PostgreSQL + pgvector database, already migrated
 
 Usage:
@@ -31,11 +31,11 @@ from app.evaluation.runner import (
     evaluate_hr_rag,
     render_hr_evaluation_report,
 )
-from app.providers.openai_embeddings import (
-    OpenAIEmbeddingError,
-    openai_embedding_provider_from_settings,
+from app.providers.gemini_embeddings import (
+    GeminiEmbeddingError,
+    gemini_embedding_provider_from_settings,
 )
-from app.providers.openai_llm import OpenAILLMError, openai_llm_provider_from_settings
+from app.providers.gemini_llm import GeminiLLMError, gemini_llm_provider_from_settings
 from app.repositories.postgres.embeddings import PostgresEmbeddingRepository
 
 
@@ -86,9 +86,9 @@ def main() -> int:
 
     settings = get_settings()
     try:
-        embedding_provider = openai_embedding_provider_from_settings(settings)
-        llm_provider = openai_llm_provider_from_settings(settings)
-    except (OpenAIEmbeddingError, OpenAILLMError) as error:
+        embedding_provider = gemini_embedding_provider_from_settings(settings)
+        llm_provider = gemini_llm_provider_from_settings(settings)
+    except (GeminiEmbeddingError, GeminiLLMError) as error:
         print(f"CONFIGURATION FAILED [{error.code.value}]: {error}")
         return 2
 

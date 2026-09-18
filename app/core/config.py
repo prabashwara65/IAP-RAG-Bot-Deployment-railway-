@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -14,15 +15,19 @@ AppEnvironment = Literal["development", "test", "staging", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 DATABASE_DRIVERNAME = "postgresql+psycopg"
-DEFAULT_OPENAI_MODEL = "gpt-5-mini"
-DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
+DEFAULT_EMBEDDING_DIMENSION = 768
+# Load `.env` from the repository root even if uvicorn is started elsewhere.
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+_ENV_FILE = _REPOSITORY_ROOT / ".env"
 
 
 class Settings(BaseSettings):
     """Validated application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -47,21 +52,34 @@ class Settings(BaseSettings):
     db_password: SecretStr = SecretStr("change-me")
     database_pool_size: int = Field(default=5, ge=1, le=50)
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=60)
-    embedding_dimension: int = Field(default=1536, ge=1, le=65535)
+    embedding_dimension: int = Field(
+        default=DEFAULT_EMBEDDING_DIMENSION, ge=1, le=65535
+    )
     rate_limit_requests: int = Field(default=5, ge=1, le=10000)
     rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600)
     rate_limit_trusted_proxy_hops: int = Field(default=1, ge=0, le=8)
-    openai_api_key: SecretStr | None = None
-    openai_model: str = Field(
-        default=DEFAULT_OPENAI_MODEL,
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = Field(
+        default=DEFAULT_GEMINI_MODEL,
         min_length=1,
         max_length=120,
     )
-    openai_embedding_model: str = Field(
-        default=DEFAULT_OPENAI_EMBEDDING_MODEL,
+    gemini_embedding_model: str = Field(
+        default=DEFAULT_GEMINI_EMBEDDING_MODEL,
         min_length=1,
         max_length=120,
     )
+    otp_ttl_seconds: int = Field(default=600, ge=60, le=3600)
+    otp_pepper: SecretStr = SecretStr("oiap-dev-otp-pepper")
+    session_ttl_seconds: int = Field(default=1_209_600, ge=300, le=31_536_000)
+    data_directory: Path = _REPOSITORY_ROOT / "data"
+    avatar_max_bytes: int = Field(default=2_097_152, ge=1024, le=10_485_760)
+    smtp_host: str = Field(default="smtp.gmail.com", min_length=1, max_length=255)
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str | None = None
+    smtp_use_tls: bool = True
 
     @field_validator(
         "app_name",
@@ -69,8 +87,9 @@ class Settings(BaseSettings):
         "db_host",
         "db_name",
         "db_user",
-        "openai_model",
-        "openai_embedding_model",
+        "gemini_model",
+        "gemini_embedding_model",
+        "smtp_host",
         mode="before",
     )
     @classmethod
@@ -149,6 +168,18 @@ class Settings(BaseSettings):
         return SecretStr(
             self.database_url_object.render_as_string(hide_password=False)
         )
+
+    @property
+    def smtp_is_configured(self) -> bool:
+        """True when Gmail SMTP can send OTP mail."""
+        username = (self.smtp_username or "").strip()
+        sender = (self.smtp_from or username).strip()
+        password = (
+            self.smtp_password.get_secret_value().strip()
+            if self.smtp_password is not None
+            else ""
+        )
+        return bool(username and password and sender)
 
 
 @lru_cache(maxsize=1)

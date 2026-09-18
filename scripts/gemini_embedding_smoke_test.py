@@ -1,10 +1,10 @@
-"""Manual OpenAI embedding connectivity check.
+"""Manual Gemini embedding connectivity check.
 
 This script performs one real, tiny API call and is never run by pytest. It
 prints only safe metadata: never the API key, and never a full vector.
 
 Usage:
-    OPENAI_API_KEY=... python -m scripts.openai_embedding_smoke_test
+    GEMINI_API_KEY=... python -m scripts.gemini_embedding_smoke_test
 
 Add --similarity to also run a local cosine sanity check on three short texts.
 That variant sends one request with three inputs instead of two.
@@ -17,9 +17,9 @@ from collections.abc import Sequence
 from math import sqrt
 
 from app.core.config import get_settings
-from app.providers.openai_embeddings import (
-    OpenAIEmbeddingError,
-    openai_embedding_provider_from_settings,
+from app.providers.gemini_embeddings import (
+    GeminiEmbeddingError,
+    gemini_embedding_provider_from_settings,
 )
 
 SMOKE_TEXTS = (
@@ -44,7 +44,7 @@ def _cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
 
 
 def _run_smoke() -> int:
-    provider = openai_embedding_provider_from_settings(get_settings())
+    provider = gemini_embedding_provider_from_settings(get_settings())
     print(f"provider={provider.model_name} model={provider.model_version}")
     print(f"configured_dimension={provider.dimension}")
 
@@ -67,7 +67,7 @@ def _run_smoke() -> int:
 
 
 def _run_similarity() -> int:
-    provider = openai_embedding_provider_from_settings(get_settings())
+    provider = gemini_embedding_provider_from_settings(get_settings())
     print(f"provider={provider.model_name} model={provider.model_version}")
 
     vectors = provider.embed_texts(SIMILARITY_TEXTS)
@@ -93,7 +93,7 @@ def main(argv: Sequence[str]) -> int:
         if "--similarity" in argv:
             return _run_similarity()
         return _run_smoke()
-    except OpenAIEmbeddingError as error:
+    except GeminiEmbeddingError as error:
         print(f"FAILED [{error.code.value}]: {error}")
         return 1
 

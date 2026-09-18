@@ -43,6 +43,7 @@ afterEach(() => {
 
 describe("askHrQuestion", () => {
   it("posts the wire contract to the HR ask endpoint", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:8000");
     mockFetch(async () => jsonResponse(SUCCESS_BODY));
 
     await askHrQuestion({ question: "How much leave?", tenant_id: "tenant-synthetic" });
@@ -84,6 +85,7 @@ describe("askHrQuestion", () => {
 
   it.each([
     [422, "invalid_request"],
+    [401, "unauthenticated"],
     [503, "unavailable"],
     [502, "upstream"],
     [504, "upstream"],

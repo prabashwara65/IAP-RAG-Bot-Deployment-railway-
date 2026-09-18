@@ -62,16 +62,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=active_settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Accept", "Content-Type", "X-Correlation-ID"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Accept", "Authorization", "Content-Type", "X-Correlation-ID"],
     )
     application.add_middleware(CorrelationIdMiddleware)
     application.include_router(api_router, prefix=active_settings.api_prefix)
 
-    get_logger("startup").info(
-        "Application configured",
-        extra={"app_version": active_settings.app_version},
-    )
+    get_logger("startup").info("Application configured")
     return application
 
 
