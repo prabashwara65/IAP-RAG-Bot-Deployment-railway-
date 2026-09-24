@@ -78,6 +78,11 @@ class MemoryUserAccountRepository:
         self.users[user_id] = updated
         return updated
 
+    def update_password(self, user_id: UUID, password_hash: str) -> None:
+        if user_id not in self.users:
+            raise LookupError("user_not_found")
+        self.password_hashes[user_id] = password_hash
+
     def create_otp(
         self,
         *,

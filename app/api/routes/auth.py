@@ -12,6 +12,7 @@ from app.core.rate_limit import enforce_rate_limit
 from app.schemas.auth import (
     LoginRequest,
     OtpIssuedResponse,
+    ResetPasswordRequest,
     SessionResponse,
     SignupRequest,
     VerifyOtpRequest,
@@ -102,6 +103,25 @@ def login(
 ) -> OtpIssuedResponse:
     try:
         issued = auth.request_login(email=payload.email, password=payload.password)
+    except AuthError as error:
+        _fail(error)
+    return _otp_response(issued)
+
+
+@router.post(
+    "/reset-password",
+    response_model=OtpIssuedResponse,
+    dependencies=[Depends(enforce_rate_limit)],
+)
+def reset_password(
+    payload: ResetPasswordRequest,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+) -> OtpIssuedResponse:
+    try:
+        issued = auth.request_reset_password(
+            email=payload.email,
+            new_password=payload.new_password,
+        )
     except AuthError as error:
         _fail(error)
     return _otp_response(issued)

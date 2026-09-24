@@ -113,6 +113,14 @@ class PostgresUserAccountRepository:
         self._session.flush()
         return _user_from_model(model)
 
+    def update_password(self, user_id: UUID, password_hash: str) -> None:
+        model = self._session.get(UserModel, user_id)
+        if model is None:
+            raise LookupError("user_not_found")
+        model.password_hash = password_hash
+        model.updated_at = datetime.now(UTC)
+        self._session.flush()
+
     def create_otp(
         self,
         *,

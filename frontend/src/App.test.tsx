@@ -547,7 +547,8 @@ describe("authentication", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText(/display name/i), "Ada");
     await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
-    await user.type(screen.getByLabelText(/^password$/i), "password12");
+    await user.type(screen.getByLabelText(/^password$/i), "Password12!");
+    await user.type(screen.getByLabelText(/^confirm password$/i), "Password12!");
     await user.click(screen.getByRole("button", { name: /send verification code/i }));
 
     expect(await screen.findByText("123456")).toBeInTheDocument();
@@ -572,10 +573,149 @@ describe("authentication", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText(/display name/i), "Ada");
     await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
-    await user.type(screen.getByLabelText(/^password$/i), "password12");
+    await user.type(screen.getByLabelText(/^password$/i), "Password12!");
+    await user.type(screen.getByLabelText(/^confirm password$/i), "Password12!");
     await user.click(screen.getByRole("button", { name: /send verification code/i }));
 
     expect(await screen.findByText(/check gmail/i)).toBeInTheDocument();
     expect(screen.queryByText("123456")).not.toBeInTheDocument();
+  });
+
+  it("prevents signup when password does not meet complexity requirements", async () => {
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/display name/i), "Ada");
+    await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
+    await user.type(screen.getByLabelText(/^password$/i), "simple");
+    await user.click(screen.getByRole("button", { name: /send verification code/i }));
+
+    expect(
+      await screen.findByText(
+        /password must be at least 8 characters and include a capital letter, a number, and a symbol/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("prevents signup when confirm password does not match", async () => {
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/display name/i), "Ada");
+    await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
+    await user.type(screen.getByLabelText(/^password$/i), "Password12!");
+    await user.type(screen.getByLabelText(/^confirm password$/i), "Different12!");
+    await user.click(screen.getByRole("button", { name: /send verification code/i }));
+
+    expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument();
+  });
+
+  it("toggles password visibility between password and text", async () => {
+    render(<App />);
+
+    const passwordInput = screen.getByLabelText(/^password$/i);
+    expect(passwordInput).toHaveAttribute("type", "password");
+
+    const toggleButton = screen.getByLabelText(/show password/i);
+    const user = userEvent.setup();
+    await user.click(toggleButton);
+
+    expect(passwordInput).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText(/hide password/i)).toBeInTheDocument();
+  });
+
+  it("switches to forgot password mode and requests password reset", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          otp_sent: true,
+          email: "ada@example.com",
+          expires_in_seconds: 600,
+          otp_code: "998877",
+          delivery: "on_screen",
+        }),
+      ),
+    );
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^log in$/i }));
+    await user.click(screen.getByRole("button", { name: /forgot password\?/i }));
+
+    expect(screen.getByText(/reset your password/i)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
+    await user.type(screen.getByLabelText(/^new password$/i), "NewPassword123!");
+    await user.type(screen.getByLabelText(/confirm new password/i), "NewPassword123!");
+    await user.click(screen.getByRole("button", { name: /send reset code/i }));
+
+    expect(await screen.findByText("998877")).toBeInTheDocument();
+  });
+
+  it("disables resend code button with countdown timer on the OTP screen", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          otp_sent: true,
+          email: "ada@example.com",
+          expires_in_seconds: 600,
+          otp_code: "123456",
+          delivery: "on_screen",
+        }),
+      ),
+    );
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/display name/i), "Ada");
+    await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
+    await user.type(screen.getByLabelText(/^password$/i), "Password12!");
+    await user.type(screen.getByLabelText(/^confirm password$/i), "Password12!");
+    await user.click(screen.getByRole("button", { name: /send verification code/i }));
+
+    await screen.findByText("123456");
+    const resendButton = screen.getByRole("button", { name: /resend code in/i });
+    expect(resendButton).toBeDisabled();
+  });
+
+  it("renders 6-cell segmented OTP input and static expiration notice", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          otp_sent: true,
+          email: "ada@example.com",
+          expires_in_seconds: 600,
+          otp_code: null,
+          delivery: "email",
+        }),
+      ),
+    );
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/display name/i), "Ada");
+    await user.type(screen.getByLabelText(/work email/i), "ada@example.com");
+    await user.type(screen.getByLabelText(/^password$/i), "Password12!");
+    await user.type(screen.getByLabelText(/^confirm password$/i), "Password12!");
+    await user.click(screen.getByRole("button", { name: /send verification code/i }));
+
+    expect(await screen.findByText(/valid for 10 minutes/i)).toBeInTheDocument();
+
+    for (let i = 1; i <= 6; i++) {
+      expect(screen.getByLabelText(new RegExp(`digit ${i} of 6`, "i"))).toBeInTheDocument();
+    }
+
+    await user.type(screen.getByLabelText(/digit 1 of 6/i), "1");
+    await user.type(screen.getByLabelText(/digit 2 of 6/i), "2");
+    await user.type(screen.getByLabelText(/digit 3 of 6/i), "3");
+    await user.type(screen.getByLabelText(/digit 4 of 6/i), "4");
+    await user.type(screen.getByLabelText(/digit 5 of 6/i), "5");
+    await user.type(screen.getByLabelText(/digit 6 of 6/i), "6");
+
+    expect(screen.getByLabelText(/digit 1 of 6/i)).toHaveValue("1");
+    expect(screen.getByLabelText(/digit 6 of 6/i)).toHaveValue("6");
+    expect(screen.getByRole("button", { name: /verify and continue/i })).toBeEnabled();
   });
 });

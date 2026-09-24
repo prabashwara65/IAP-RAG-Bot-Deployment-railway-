@@ -199,3 +199,46 @@ async def test_login_requires_password_then_otp(tmp_path: Path) -> None:
     assert login.status_code == 200
     assert login.json()["otp_code"] is not None
     assert login.json()["delivery"] == "on_screen"
+
+
+async def test_reset_password_flow_via_api(tmp_path: Path) -> None:
+    application, _store = _application(tmp_path)
+    async with await _client(application) as client:
+        # Sign up
+        issued = await client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "ada@example.com",
+                "display_name": "Ada",
+                "password": "password12",
+            },
+        )
+        await client.post(
+            "/api/v1/auth/verify",
+            json={"email": "ada@example.com", "code": issued.json()["otp_code"]},
+        )
+
+        # Reset password
+        reset_req = await client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "email": "ada@example.com",
+                "new_password": "NewSecretPassword123!",
+            },
+        )
+        assert reset_req.status_code == 200
+        reset_otp = reset_req.json()["otp_code"]
+
+        # Verify OTP
+        verify_resp = await client.post(
+            "/api/v1/auth/verify",
+            json={"email": "ada@example.com", "code": reset_otp},
+        )
+        assert verify_resp.status_code == 200
+
+        # Login with new password
+        login = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "ada@example.com", "password": "NewSecretPassword123!"},
+        )
+        assert login.status_code == 200

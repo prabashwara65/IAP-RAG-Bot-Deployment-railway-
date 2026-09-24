@@ -191,6 +191,23 @@ class AuthService:
             password_hash=None,
         )
 
+    def request_reset_password(self, *, email: str, new_password: str) -> IssuedOtp:
+        normalized_email = _validate_email(email)
+        _validate_password(new_password)
+        existing = self._repository.get_user_by_email(normalized_email)
+        if existing is None:
+            raise AuthError(
+                AuthErrorCode.ACCOUNT_NOT_FOUND,
+                "No account was found for that email. Sign up first.",
+            )
+        hashed = hash_password(new_password)
+        return self._issue_otp(
+            email=normalized_email,
+            purpose="login",
+            display_name=None,
+            password_hash=hashed,
+        )
+
     def verify_otp(self, *, email: str, code: str) -> IssuedSession:
         normalized_email = _validate_email(email)
         challenge = self._repository.latest_open_otp(normalized_email)
@@ -251,6 +268,8 @@ class AuthService:
                     AuthErrorCode.ACCOUNT_NOT_FOUND,
                     "No account was found for that email. Sign up first.",
                 )
+            if challenge.password_hash:
+                self._repository.update_password(existing.id, challenge.password_hash)
             user = existing
         return self._open_session(user)
 

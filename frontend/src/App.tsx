@@ -30,7 +30,7 @@ export function App() {
   const [user, setUser] = useState<Profile | null>(null);
   const [otp, setOtp] = useState<{
     issued: OtpIssued;
-    mode: "signup" | "login";
+    mode: "signup" | "login" | "reset";
     name: string;
     password: string;
   } | null>(null);

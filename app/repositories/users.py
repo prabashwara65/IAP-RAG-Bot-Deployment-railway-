@@ -41,6 +41,8 @@ class UserAccountRepository(Protocol):
         clear_avatar: bool = False,
     ) -> UserAccount: ...
 
+    def update_password(self, user_id: UUID, password_hash: str) -> None: ...
+
     def create_otp(
         self,
         *,

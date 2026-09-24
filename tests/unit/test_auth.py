@@ -267,3 +267,46 @@ def test_avatar_upload_rejects_non_images(tmp_path: Path) -> None:
     with pytest.raises(AuthError) as error:
         service.save_avatar(session.user, b"not-an-image", "text/plain")
     assert error.value.code is AuthErrorCode.INVALID_AVATAR
+
+
+def test_reset_password_updates_password(tmp_path: Path) -> None:
+    service, _store = _service(tmp_path)
+    signup_issued = service.request_signup(
+        email="ada@example.com",
+        display_name="Ada",
+        password=PASSWORD,
+    )
+    assert signup_issued.otp_code is not None
+    service.verify_otp(email="ada@example.com", code=signup_issued.otp_code)
+
+    # Request password reset
+    new_password = "BrandNewPassword123!"
+    reset_issued = service.request_reset_password(
+        email="ada@example.com",
+        new_password=new_password,
+    )
+    assert reset_issued.otp_code is not None
+    session = service.verify_otp(email="ada@example.com", code=reset_issued.otp_code)
+    assert session.user.email == "ada@example.com"
+
+    # Login with new password works
+    login_issued = service.request_login(
+        email="ada@example.com",
+        password=new_password,
+    )
+    assert login_issued.otp_code is not None
+
+    # Login with old password fails
+    with pytest.raises(AuthError) as error:
+        service.request_login(email="ada@example.com", password=PASSWORD)
+    assert error.value.code is AuthErrorCode.INVALID_CREDENTIALS
+
+
+def test_reset_password_unknown_email_rejected(tmp_path: Path) -> None:
+    service, _store = _service(tmp_path)
+    with pytest.raises(AuthError) as error:
+        service.request_reset_password(
+            email="nobody@example.com",
+            new_password="BrandNewPassword123!",
+        )
+    assert error.value.code is AuthErrorCode.ACCOUNT_NOT_FOUND

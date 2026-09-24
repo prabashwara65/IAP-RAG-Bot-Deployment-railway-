@@ -169,6 +169,20 @@ export async function requestLogin(
   return payload;
 }
 
+export async function requestResetPassword(
+  email: string,
+  newPassword: string,
+): Promise<OtpIssued> {
+  const payload = await postAuth("/api/v1/auth/reset-password", {
+    email,
+    new_password: newPassword,
+  });
+  if (!isOtpIssued(payload)) {
+    throw new AuthApiError("unexpected");
+  }
+  return payload;
+}
+
 export async function verifyOtp(email: string, code: string): Promise<SessionPayload> {
   const payload = await postAuth("/api/v1/auth/verify", { email, code });
   if (!isSessionPayload(payload)) {
