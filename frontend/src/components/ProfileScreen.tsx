@@ -16,6 +16,7 @@ interface ProfileScreenProps {
   avatarUrl: string | null;
   onUpdated: (user: Profile) => void;
   onAvatarChanged: () => void;
+  onClose: () => void;
 }
 
 export function ProfileScreen({
@@ -23,6 +24,7 @@ export function ProfileScreen({
   avatarUrl,
   onUpdated,
   onAvatarChanged,
+  onClose,
 }: ProfileScreenProps) {
   const [displayName, setDisplayName] = useState(user.display_name);
   const [busy, setBusy] = useState(false);
@@ -35,8 +37,12 @@ export function ProfileScreen({
     setBusy(true);
     setMessage(null);
     setNotice(null);
+
     try {
-      const updated = await updateProfile({ display_name: displayName.trim() });
+      const updated = await updateProfile({
+        display_name: displayName.trim(),
+      });
+
       onUpdated(updated);
       setNotice("Profile saved.");
     } catch (error) {
@@ -67,10 +73,13 @@ export function ProfileScreen({
     if (file === undefined) {
       return;
     }
+
     setBusy(true);
     setMessage(null);
+
     try {
       const updated = await uploadAvatar(file);
+
       onUpdated(updated);
       onAvatarChanged();
       setNotice("Profile image updated.");
@@ -82,6 +91,7 @@ export function ProfileScreen({
       );
     } finally {
       setBusy(false);
+
       if (fileInput.current !== null) {
         fileInput.current.value = "";
       }
@@ -91,8 +101,10 @@ export function ProfileScreen({
   async function removePhoto() {
     setBusy(true);
     setMessage(null);
+
     try {
       const updated = await deleteAvatar();
+
       onUpdated(updated);
       onAvatarChanged();
       setNotice("Profile image removed.");
@@ -109,13 +121,33 @@ export function ProfileScreen({
 
   return (
     <section className="glass profile-panel">
-      <h2 className="profile-panel__title">Your profile</h2>
+
+      {/* CLOSE PROFILE */}
+      <button
+        className="profile-panel__close"
+        type="button"
+        onClick={onClose}
+        aria-label="Close profile"
+        title="Close"
+      >
+        ×
+      </button>
+
+      <h2 className="profile-panel__title">
+        Your profile
+      </h2>
+
       <p className="page__subtitle">
         Manage how you appear in the assistant, including your photo and theme.
       </p>
 
       <div className="profile-hero">
-        <AvatarMark imageUrl={avatarUrl} name={user.display_name} size="lg" />
+        <AvatarMark
+          imageUrl={avatarUrl}
+          name={user.display_name}
+          size="lg"
+        />
+
         <div className="stack">
           <input
             accept="image/jpeg,image/png,image/webp"
@@ -126,6 +158,7 @@ export function ProfileScreen({
             ref={fileInput}
             type="file"
           />
+
           <button
             className="btn btn--primary"
             disabled={busy}
@@ -134,6 +167,7 @@ export function ProfileScreen({
           >
             Change photo
           </button>
+
           {user.has_avatar ? (
             <button
               className="btn btn--ghost"
@@ -149,44 +183,88 @@ export function ProfileScreen({
         </div>
       </div>
 
-      <form className="stack" onSubmit={save}>
+      <form
+        className="stack"
+        onSubmit={save}
+      >
         <label className="field">
-          <span className="field__label">Display name</span>
+          <span className="field__label">
+            Display name
+          </span>
+
           <input
             className="field__input"
             maxLength={80}
-            onChange={(event) => setDisplayName(event.target.value)}
+            onChange={(event) =>
+              setDisplayName(event.target.value)
+            }
             required
             value={displayName}
           />
         </label>
+
         <label className="field">
-          <span className="field__label">Email</span>
-          <input className="field__input" disabled readOnly value={user.email} />
+          <span className="field__label">
+            Email
+          </span>
+
+          <input
+            className="field__input"
+            disabled
+            readOnly
+            value={user.email}
+          />
         </label>
+
         <aside className="security-card">
-          <p className="security-card__label">Two-factor authentication</p>
-          <p className="security-card__title">Email OTP via Gmail</p>
+          <p className="security-card__label">
+            Two-factor authentication
+          </p>
+
+          <p className="security-card__title">
+            Email OTP via Gmail
+          </p>
+
           <p className="security-card__hint">
             After your password, we send a 6-digit code to {user.email}. This is
             the only 2FA method for this account.
           </p>
         </aside>
+
         <div className="field">
-          <span className="field__label">Appearance</span>
-          <ThemeToggle onChange={(theme) => void changeTheme(theme)} theme={user.theme} />
+          <span className="field__label">
+            Appearance
+          </span>
+
+          <ThemeToggle
+            onChange={(theme) => void changeTheme(theme)}
+            theme={user.theme}
+          />
         </div>
+
         {message === null ? null : (
-          <p className="notice notice--error" role="alert">
+          <p
+            className="notice notice--error"
+            role="alert"
+          >
             {message}
           </p>
         )}
+
         {notice === null ? null : (
-          <p className="notice notice--ok" role="status">
+          <p
+            className="notice notice--ok"
+            role="status"
+          >
             {notice}
           </p>
         )}
-        <button className="btn btn--primary" disabled={busy} type="submit">
+
+        <button
+          className="btn btn--primary"
+          disabled={busy}
+          type="submit"
+        >
           {busy ? "Saving…" : "Save profile"}
         </button>
       </form>

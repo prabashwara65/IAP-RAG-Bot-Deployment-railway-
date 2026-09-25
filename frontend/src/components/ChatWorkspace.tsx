@@ -72,12 +72,6 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
   return (
     <main className="chat">
       <div className="chat__transcript" role="log" aria-label="Conversation">
-        {turns.length === 0 && !isLoading ? (
-          <p className="chat__empty">
-            Ask a question to begin. Every answer is drawn only from approved HR
-            documents, and its sources are listed underneath.
-          </p>
-        ) : null}
 
         {turns.map((turn) => (
           <ChatMessage key={turn.id} turn={turn} />

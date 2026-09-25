@@ -20,46 +20,74 @@ export function AppHeader({
   theme,
   onThemeChange,
   onOpenProfile,
-  onOpenChat,
   onLogout,
-  active,
+  
 }: AppHeaderProps) {
   return (
     <header className="glass topbar">
-      <div className="topbar__brand">
-        <p className="eyebrow">Office Intelligence</p>
-        <h1 className="page__title">OIAP HR Assistant</h1>
-        <p className="page__subtitle">Ask questions using approved HR knowledge.</p>
+
+      {/* TOP SECTION */}
+      <div className="topbar__top">
+
+        {/* TOP LEFT */}
+        <div className="topbar__brand">
+          <p className="eyebrow">Office Intelligence</p>
+
+          <h1 className="page__title">
+            Office Assistant
+          </h1>
+
+          <p className="page__subtitle">
+            Ask questions about company policies and processes.
+          </p>
+        </div>
+
+        {/* TOP RIGHT */}
+        <div className="topbar__account">
+
+          {/* PROFILE AVATAR + NAME */}
+          <button
+            className="profile-hit"
+            onClick={onOpenProfile}
+            type="button"
+            aria-label="Open profile"
+          >
+            <AvatarMark
+              imageUrl={avatarUrl}
+              name={user.display_name}
+            />
+
+            <span className="profile-hit__name">
+              {user.display_name}
+            </span>
+          </button>
+
+          {/* LOGOUT */}
+          <button
+            className="text-btn"
+            onClick={onLogout}
+            type="button"
+          >
+            Log out
+          </button>
+
+        </div>
       </div>
+
+      {/* BOTTOM ACTIONS */}
       <div className="topbar__actions">
-        <ThemeToggle theme={theme} onChange={onThemeChange} />
-        <button
-          className={active === "chat" ? "chip is-active" : "chip"}
-          onClick={onOpenChat}
-          type="button"
-        >
-          Chat
-        </button>
-        <button
-          className={active === "profile" ? "chip is-active" : "chip"}
-          onClick={onOpenProfile}
-          type="button"
-        >
-          Profile
-        </button>
-        <button
-          className="profile-hit"
-          onClick={onOpenProfile}
-          type="button"
-          aria-label="Open profile"
-        >
-          <AvatarMark imageUrl={avatarUrl} name={user.display_name} />
-          <span className="profile-hit__name">{user.display_name}</span>
-        </button>
-        <button className="text-btn" onClick={onLogout} type="button">
-          Log out
-        </button>
+
+        {/* LEFT SIDE */}
+        <div className="topbar__nav">
+
+          <ThemeToggle
+            theme={theme}
+            onChange={onThemeChange}
+          />
+
+        </div>
       </div>
+
     </header>
   );
 }

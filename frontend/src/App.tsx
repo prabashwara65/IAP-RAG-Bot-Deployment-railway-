@@ -11,31 +11,42 @@ import { AppHeader } from "./components/AppHeader";
 import { AuthScreen } from "./components/AuthScreen";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { OtpScreen } from "./components/OtpScreen";
+import { LogoutConfirmModal } from "./components/LogoutConfirmModal";
 import { ProfileScreen } from "./components/ProfileScreen";
 
 type Screen = "auth" | "otp" | "chat" | "profile";
 
 function applyTheme(theme: ThemePreference) {
   const root = document.documentElement;
+
   if (theme === "system") {
-    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const dark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
+
     root.dataset.theme = dark ? "dark" : "light";
     return;
   }
+
   root.dataset.theme = theme;
 }
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("auth");
   const [user, setUser] = useState<Profile | null>(null);
+
   const [otp, setOtp] = useState<{
     issued: OtpIssued;
     mode: "signup" | "login" | "reset";
     name: string;
     password: string;
   } | null>(null);
+
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
+
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const loadAvatar = useCallback(async (profile: Profile) => {
     if (!profile.has_avatar) {
@@ -43,40 +54,53 @@ export function App() {
         if (previous !== null) {
           URL.revokeObjectURL(previous);
         }
+
         return null;
       });
+
       return;
     }
+
     const blob = await fetchAvatarBlob();
+
     if (blob === null) {
       setAvatarUrl(null);
       return;
     }
+
     const url = URL.createObjectURL(blob);
+
     setAvatarUrl((previous) => {
       if (previous !== null) {
         URL.revokeObjectURL(previous);
       }
+
       return url;
     });
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+
     async function restore() {
       const token = getAccessToken();
+
       if (token === null) {
         setBooting(false);
         return;
       }
+
       try {
         const profile = await fetchProfile();
+
         if (cancelled) {
           return;
         }
+
         setUser(profile);
         applyTheme(profile.theme);
         setScreen("chat");
+
         await loadAvatar(profile);
       } catch {
         setAccessToken(null);
@@ -86,35 +110,63 @@ export function App() {
         }
       }
     }
+
     void restore();
+
     return () => {
       cancelled = true;
     };
   }, [loadAvatar]);
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const media = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    );
+
     const sync = () => {
       if (user?.theme === "system" || user === null) {
         applyTheme(user?.theme ?? "system");
       }
     };
+
     media.addEventListener("change", sync);
+
     applyTheme(user?.theme ?? "system");
-    return () => media.removeEventListener("change", sync);
+
+    return () => {
+      media.removeEventListener("change", sync);
+    };
   }, [user]);
 
   async function handleLogout() {
     await logoutRequest();
+
     setUser(null);
     setOtp(null);
     setScreen("auth");
+
     setAvatarUrl((previous) => {
       if (previous !== null) {
         URL.revokeObjectURL(previous);
       }
+
       return null;
     });
+  }
+
+  async function confirmLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+
+    try {
+      await handleLogout();
+      setLogoutOpen(false);
+    } finally {
+      setIsLoggingOut(false);
+    }
   }
 
   async function handleTheme(theme: ThemePreference) {
@@ -122,8 +174,12 @@ export function App() {
       applyTheme(theme);
       return;
     }
+
     try {
-      const updated = await updateProfile({ theme });
+      const updated = await updateProfile({
+        theme,
+      });
+
       setUser(updated);
       applyTheme(updated.theme);
     } catch {
@@ -134,7 +190,10 @@ export function App() {
   if (booting) {
     return (
       <div className="auth-layout">
-        <p className="chat__empty" role="status">
+        <p
+          className="chat__empty"
+          role="status"
+        >
           Loading…
         </p>
       </div>
@@ -153,21 +212,29 @@ export function App() {
             setUser(profile);
             applyTheme(profile.theme);
             setScreen("chat");
+
             void loadAvatar(profile);
           }}
           password={otp.password}
         />
       );
     }
+
     return (
       <AuthScreen
-        onOtpIssued={(issued, mode, displayName, password) => {
+        onOtpIssued={(
+          issued,
+          mode,
+          displayName,
+          password,
+        ) => {
           setOtp({
             issued,
             mode,
             name: displayName,
             password,
           });
+
           setScreen("otp");
         }}
       />
@@ -185,6 +252,7 @@ export function App() {
           setUser(profile);
           applyTheme(profile.theme);
           setScreen("chat");
+
           void loadAvatar(profile);
         }}
         password={otp.password}
@@ -195,11 +263,13 @@ export function App() {
   return (
     <div className="page">
       <AppHeader
-        active={screen === "profile" ? "profile" : "chat"}
+        active={
+          screen === "profile"
+            ? "profile"
+            : "chat"
+        }
         avatarUrl={avatarUrl}
-        onLogout={() => {
-          void handleLogout();
-        }}
+        onLogout={() => setLogoutOpen(true)}
         onOpenChat={() => setScreen("chat")}
         onOpenProfile={() => setScreen("profile")}
         onThemeChange={(theme) => {
@@ -208,15 +278,18 @@ export function App() {
         theme={user.theme}
         user={user}
       />
+
       {screen === "profile" ? (
         <ProfileScreen
           avatarUrl={avatarUrl}
           onAvatarChanged={() => {
             void loadAvatar(user);
           }}
+          onClose={() => setScreen("chat")}
           onUpdated={(profile) => {
             setUser(profile);
             applyTheme(profile.theme);
+
             void loadAvatar(profile);
           }}
           user={user}
@@ -228,10 +301,20 @@ export function App() {
           }}
         />
       )}
+
+      <LogoutConfirmModal
+        isLoggingOut={isLoggingOut}
+        isOpen={logoutOpen}
+        onCancel={() => setLogoutOpen(false)}
+        onConfirm={() => {
+          void confirmLogout();
+        }}
+      />
+
       <footer className="page__footer">
         <p>
-          Answers are generated only from HR documents approved for retrieval.
-          Always confirm anything consequential with your HR team.
+          Answers are generated only from documents approved for retrieval.
+          Always confirm anything consequential with your team.
         </p>
       </footer>
     </div>

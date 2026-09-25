@@ -49,7 +49,7 @@ export function ChatComposer({ isLoading, onAsk }: ChatComposerProps) {
   return (
     <form className="composer" onSubmit={handleSubmit}>
       <label className="composer__label" htmlFor="question">
-        Your HR question
+        Your question
       </label>
       <div className="composer__row">
         <textarea
@@ -75,7 +75,7 @@ export function ChatComposer({ isLoading, onAsk }: ChatComposerProps) {
         </button>
       </div>
       <p className="composer__hint">
-        Enter to send · Shift+Enter for a new line ·{" "}
+        Enter to send · words{" "}
         {trimmedQuestion.length}/{MAX_QUESTION_LENGTH}
       </p>
     </form>
