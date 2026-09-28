@@ -6,7 +6,7 @@ import { ChatMessage } from "./ChatMessage";
 import type { ChatTurn } from "./ChatMessage";
 import { ErrorNotice } from "./ErrorNotice";
 
-const TENANT_ID = "tenant-synthetic";
+const TENANT_ID = "real";
 
 interface Failure {
   kind: HrAskFailureKind;

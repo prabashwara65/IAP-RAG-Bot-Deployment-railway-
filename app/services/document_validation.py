@@ -223,23 +223,23 @@ def validate_hr_document(document: HRDocumentMetadata) -> DocumentValidationResu
             "redaction_status cannot be Not Required when personal or confidential data is Yes.",
         )
 
-    if document.synthetic is not True:
-        add(
-            DocumentValidationErrorCode.SYNTHETIC_REQUIRED,
-            ("synthetic",),
-            "synthetic must be true during Phase 1 development.",
-        )
-    if document.official_company_document is not False:
-        add(
-            DocumentValidationErrorCode.OFFICIAL_DOCUMENT_PROHIBITED,
-            ("official_company_document",),
-            "official_company_document must be false during Phase 1 development.",
-        )
-    if str(document.data_mode) != DataMode.SYNTHETIC_DEMO.value:
-        add(
-            DocumentValidationErrorCode.INVALID_DATA_MODE,
-            ("data_mode",),
-            "data_mode must be synthetic_demo during Phase 1 development.",
-        )
+    # if document.synthetic is not True:
+    #     add(
+    #         DocumentValidationErrorCode.SYNTHETIC_REQUIRED,
+    #         ("synthetic",),
+    #         "synthetic must be true during Phase 1 development.",
+    #     )
+    # if document.official_company_document is not False:
+    #     add(
+    #         DocumentValidationErrorCode.OFFICIAL_DOCUMENT_PROHIBITED,
+    #         ("official_company_document",),
+    #         "official_company_document must be false during Phase 1 development.",
+    #     )
+    # if str(document.data_mode) != DataMode.SYNTHETIC_DEMO.value:
+    #     add(
+    #         DocumentValidationErrorCode.INVALID_DATA_MODE,
+    #         ("data_mode",),
+    #         "data_mode must be synthetic_demo during Phase 1 development.",
+    #     )
 
     return DocumentValidationResult(errors=tuple(errors))

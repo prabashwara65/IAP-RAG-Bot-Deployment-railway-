@@ -15,7 +15,7 @@ from google.genai import types
 
 from app.core.config import Settings
 
-DEFAULT_MAX_OUTPUT_TOKENS = 800
+DEFAULT_MAX_OUTPUT_TOKENS = 2048
 GEMINI_PROVIDER_NAME = "gemini"
 
 
@@ -106,8 +106,10 @@ class GeminiLLMProvider:
         System instructions travel as ``system_instruction``. The user prompt
         is the request body. They are never concatenated into one string.
 
-        The returned text is the SDK ``text`` field verbatim; only the
-        emptiness check ignores surrounding whitespace.
+        All text parts from all candidates are concatenated into the returned
+        string. This handles the case where the Gemini SDK returns a response
+        with multiple parts, which otherwise truncates the answer to the first
+        part only.
         """
         try:
             response = self._client.models.generate_content(
@@ -127,18 +129,41 @@ class GeminiLLMProvider:
                 f"The Gemini request failed: {type(error).__name__}.",
             ) from error
 
-        text: object = getattr(response, "text", None)
-        if not isinstance(text, str):
-            raise GeminiLLMError(
-                GeminiLLMErrorCode.INVALID_PROVIDER_RESPONSE,
-                "The Gemini response did not contain textual output.",
-            )
+        text = self._extract_text(response)
         if not text.strip():
             raise GeminiLLMError(
                 GeminiLLMErrorCode.EMPTY_PROVIDER_RESPONSE,
                 "The Gemini response contained no output text.",
             )
         return text
+
+    @staticmethod
+    def _extract_text(response: object) -> str:
+        """Concatenate all text parts from the Gemini response.
+
+        The SDK's ``response.text`` property returns only the first text part
+        in some cases. We iterate over all candidates and parts to capture
+        the full output before falling back to ``response.text``.
+        """
+        candidates = getattr(response, "candidates", None)
+        if isinstance(candidates, list):
+            parts: list[str] = []
+            for candidate in candidates:
+                content = getattr(candidate, "content", None)
+                if content is None:
+                    continue
+                part_list = getattr(content, "parts", None)
+                if not isinstance(part_list, list):
+                    continue
+                for part in part_list:
+                    part_text = getattr(part, "text", None)
+                    if isinstance(part_text, str) and part_text:
+                        parts.append(part_text)
+            if parts:
+                return "".join(parts)
+
+        text = getattr(response, "text", None)
+        return text if isinstance(text, str) else ""
 
 
 def gemini_llm_provider_from_settings(settings: Settings) -> GeminiLLMProvider:

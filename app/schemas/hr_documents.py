@@ -1,4 +1,9 @@
-"""Governed metadata contract for synthetic HR documents."""
+"""Governed metadata contract for HR documents.
+
+Covers synthetic demo documents and, going forward, real governed
+documents. New enum values are additive: existing synthetic documents
+continue to validate unchanged.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +29,7 @@ class DocumentType(StrEnum):
     FAQ = "FAQ"
     TECHNICAL_GUIDELINE = "Technical Guideline"
     CONTACT_DIRECTORY = "Contact Directory"
+    PROJECT_PROPOSAL = "Project Proposal"
     OTHER = "Other"
 
 
@@ -36,6 +42,7 @@ class Department(StrEnum):
     SALES = "Sales"
     CUSTOMER_SUPPORT = "Customer Support"
     MANAGEMENT = "Management"
+    MARKETING = "Marketing"
     OTHER = "Other"
 
 
@@ -91,6 +98,7 @@ class RedactionStatus(StrEnum):
 
 class DataMode(StrEnum):
     SYNTHETIC_DEMO = "synthetic_demo"
+    REAL_DOCUMENT = "real_document"
 
 
 class HRDocumentMetadata(BaseModel):
