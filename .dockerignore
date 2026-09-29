@@ -20,10 +20,10 @@ htmlcov
 frontend
 tests
 docs
-data
+
 
 requirements-dev.txt
-**/*.md
+
 
 .vscode
 .idea
