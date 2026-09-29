@@ -27,8 +27,8 @@ Thumbs.db
 
 # Logs and local data
 *.log
-data/*
-!data/.gitkeep
+# data/*
+# !data/.gitkeep
 
 # Frontend
 frontend/node_modules/
