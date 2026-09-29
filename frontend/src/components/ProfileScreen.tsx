@@ -30,10 +30,15 @@ export function ProfileScreen({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [photoChanged, setPhotoChanged] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const hasUnsavedName = displayName.trim() !== user.display_name;
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hasUnsavedName) return;
+
     setBusy(true);
     setMessage(null);
     setNotice(null);
@@ -82,6 +87,7 @@ export function ProfileScreen({
 
       onUpdated(updated);
       onAvatarChanged();
+      setPhotoChanged(true);
       setNotice("Profile image updated.");
     } catch (error) {
       setMessage(
@@ -107,6 +113,7 @@ export function ProfileScreen({
 
       onUpdated(updated);
       onAvatarChanged();
+      setPhotoChanged(false);
       setNotice("Profile image removed.");
     } catch (error) {
       setMessage(
@@ -121,8 +128,6 @@ export function ProfileScreen({
 
   return (
     <section className="glass profile-panel">
-
-      {/* CLOSE PROFILE */}
       <button
         className="profile-panel__close"
         type="button"
@@ -159,14 +164,16 @@ export function ProfileScreen({
             type="file"
           />
 
-          <button
-            className="btn btn--primary"
-            disabled={busy}
-            onClick={() => fileInput.current?.click()}
-            type="button"
-          >
-            Change photo
-          </button>
+          {!photoChanged ? (
+            <button
+              className="btn btn--primary"
+              disabled={busy}
+              onClick={() => fileInput.current?.click()}
+              type="button"
+            >
+              Change photo
+            </button>
+          ) : null}
 
           {user.has_avatar ? (
             <button
@@ -260,13 +267,15 @@ export function ProfileScreen({
           </p>
         )}
 
-        <button
-          className="btn btn--primary"
-          disabled={busy}
-          type="submit"
-        >
-          {busy ? "Saving…" : "Save profile"}
-        </button>
+        {hasUnsavedName ? (
+          <button
+            className="btn btn--primary"
+            disabled={busy}
+            type="submit"
+          >
+            {busy ? "Saving…" : "Save profile"}
+          </button>
+        ) : null}
       </form>
     </section>
   );

@@ -1,24 +1,36 @@
 import react from "@vitejs/plugin-react";
+import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
-// The backend CORS allowlist contains http://localhost:3000, so the dev server
-// runs there instead of Vite's default 5173. strictPort makes a port clash fail
-// loudly rather than silently moving to an origin the backend would reject.
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: "localhost",
-    port: 3000,
-    strictPort: true,
-  },
-  preview: {
-    port: 3000,
-    strictPort: true,
-  },
-  test: {
-    environment: "jsdom",
-    globals: false,
-    setupFiles: ["./src/test/setup.ts"],
-    css: false,
-  },
+export default defineConfig(({ mode }) => {
+  // Browsers call /api on this host; only Vite connects to the backend.
+  const env = loadEnv(mode, process.cwd(), "DEV_API_TARGET");
+  const apiProxy = {
+    "/api": {
+      target: env.DEV_API_TARGET || "http://127.0.0.1:8000",
+      changeOrigin: true,
+    },
+  };
+
+  return {
+    plugins: [react()],
+    server: {
+      host: "0.0.0.0",
+      port: 3000,
+      strictPort: true,
+      proxy: apiProxy,
+    },
+    preview: {
+      host: "0.0.0.0",
+      port: 3000,
+      strictPort: true,
+      proxy: apiProxy,
+    },
+    test: {
+      environment: "jsdom",
+      globals: false,
+      setupFiles: ["./src/test/setup.ts"],
+      css: false,
+    },
+  };
 });

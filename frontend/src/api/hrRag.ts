@@ -6,7 +6,7 @@
  * rather than as a silent runtime mismatch in a component.
  */
 
-import { jsonHeaders } from "./http";
+import {  apiBaseUrl,jsonHeaders } from "./http";
 
 const ASK_PATH = "/api/v1/hr/ask";
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -64,10 +64,10 @@ export class HrAskError extends Error {
   }
 }
 
-function apiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-  return configured.replace(/\/+$/, "");
-}
+// function apiBaseUrl(): string {
+//   const configured = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+//   return configured.replace(/\/+$/, "");
+// }
 
 function failureKindForStatus(status: number): HrAskFailureKind {
   if (status === 422 || status === 400) {

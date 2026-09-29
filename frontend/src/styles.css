@@ -1,6 +1,7 @@
 :root {
   --surface: rgba(255, 255, 255, 0.58);
   --surface-strong: rgba(255, 255, 255, 0.78);
+  --dialog-surface: #ffffff;
   --surface-muted: rgba(245, 248, 255, 0.5);
   --border: rgba(255, 255, 255, 0.55);
   --border-strong: rgba(148, 163, 184, 0.35);
@@ -31,6 +32,7 @@
 html[data-theme="dark"] {
   --surface: rgba(16, 24, 42, 0.55);
   --surface-strong: rgba(22, 32, 54, 0.78);
+  --dialog-surface: #162036;
   --surface-muted: rgba(10, 16, 30, 0.45);
   --border: rgba(255, 255, 255, 0.12);
   --border-strong: rgba(148, 163, 184, 0.28);
@@ -174,6 +176,26 @@ html[data-theme="dark"] body {
   color: var(--text-muted);
   margin: 0;
   padding: 1.5rem 0.25rem;
+}
+
+.chat-welcome {
+  align-self: center;
+  margin: auto 0;
+  max-width: 34rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  width: 100%;
+}
+
+.chat-welcome__title {
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.5rem;
+}
+
+.chat-welcome__description {
+  color: var(--text-muted);
+  margin: 0;
 }
 
 .page__footer {
@@ -975,10 +997,10 @@ html[data-theme="dark"] body {
 }
 
 .logout-modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--dialog-surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35);
   max-width: 26rem;
   padding: 1.5rem;
   position: relative;
@@ -1066,13 +1088,22 @@ html[data-theme="dark"] body {
 }
 
 .logout-modal__button--cancel {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: #eef2f8;
+  border: 1px solid #cbd5e1;
   color: var(--text);
 }
 
 .logout-modal__button--cancel:hover:not(:disabled) {
-  background: var(--surface-muted);
+  background: #e2e8f0;
+}
+
+html[data-theme="dark"] .logout-modal__button--cancel {
+  background: #26354d;
+  border-color: #526581;
+}
+
+html[data-theme="dark"] .logout-modal__button--cancel:hover:not(:disabled) {
+  background: #334866;
 }
 
 .logout-modal__button--confirm {
