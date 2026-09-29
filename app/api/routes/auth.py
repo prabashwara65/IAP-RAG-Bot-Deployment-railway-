@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.dependencies import get_auth_service, get_bearer_token
 from app.core.rate_limit import enforce_rate_limit
+from app.schemas.common import ErrorDetail, ErrorResponse
 from app.schemas.auth import (
     LoginRequest,
     OtpIssuedResponse,
@@ -70,6 +72,23 @@ def _session_response(issued: IssuedSession) -> SessionResponse:
         access_token=issued.access_token,
         user=ProfileResponse.from_account(issued.user),
     )
+
+
+def _otp_failure_response(request: Request, error: AuthError) -> JSONResponse:
+    """Return a normal response so the request session commits OTP state."""
+    status_code = 404 if error.code is AuthErrorCode.ACCOUNT_NOT_FOUND else 422
+    response = ErrorResponse(
+        error=ErrorDetail(
+            code=(
+                error.code.value.upper()
+                if error.code in {AuthErrorCode.OTP_LOCKED, AuthErrorCode.INVALID_OTP}
+                else f"HTTP_{status_code}"
+            ),
+            message=str(error),
+            correlation_id=getattr(request.state, "correlation_id", "unavailable"),
+        )
+    )
+    return JSONResponse(status_code=status_code, content=response.model_dump(exclude_none=True))
 
 
 @router.post(
@@ -135,11 +154,22 @@ def reset_password(
 def verify(
     payload: VerifyOtpRequest,
     auth: Annotated[AuthService, Depends(get_auth_service)],
-) -> SessionResponse:
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> SessionResponse | JSONResponse:
     try:
         issued = auth.verify_otp(email=payload.email, code=payload.code)
     except AuthError as error:
+        if error.code in {
+            AuthErrorCode.INVALID_OTP,
+            AuthErrorCode.OTP_LOCKED,
+            AuthErrorCode.OTP_EXPIRED,
+            AuthErrorCode.ACCOUNT_NOT_FOUND,
+        }:
+            return _otp_failure_response(request, error)
         _fail(error)
+    if issued.password_changed:
+        background_tasks.add_task(auth.send_password_changed_notice, issued.user.email)
     return _session_response(issued)
 
 

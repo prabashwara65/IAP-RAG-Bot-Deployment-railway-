@@ -68,7 +68,7 @@ export function AppHeader({
             onClick={onLogout}
             type="button"
           >
-            Log out
+            Logout
           </button>
 
         </div>

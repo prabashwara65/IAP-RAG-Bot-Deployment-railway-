@@ -12,6 +12,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from app.core.config import Settings
+from app.core.logging import get_logger
 from app.domain.accounts import THEME_VALUES, OtpPurpose, ThemePreference, UserAccount
 from app.repositories.users import UserAccountRepository
 from app.services.mail import Mailer, SmtpMailError, mailer_from_settings
@@ -19,6 +20,7 @@ from app.services.mail import Mailer, SmtpMailError, mailer_from_settings
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 OTP_LENGTH = 6
 MAX_OTP_ATTEMPTS = 5
+logger = get_logger("auth")
 MIN_PASSWORD_LENGTH = 8
 PBKDF2_ITERATIONS = 200_000
 ALLOWED_AVATAR_TYPES = {
@@ -67,6 +69,7 @@ class IssuedOtp:
 class IssuedSession:
     access_token: str
     user: UserAccount
+    password_changed: bool = False
 
 
 def normalize_email(value: str) -> str:
@@ -124,17 +127,22 @@ def _validate_display_name(name: str) -> str:
     return trimmed
 
 
-def _validate_password(password: str) -> str:
+def _validate_password(password: str, *, require_strong: bool = False) -> str:
+    message = (
+        "Password must be at least 8 characters and include a capital letter, a number, and a symbol."
+        if require_strong
+        else "Choose a password of at least 8 characters."
+    )
     if len(password) < MIN_PASSWORD_LENGTH or len(password) > 128:
-        raise AuthError(
-            AuthErrorCode.INVALID_PASSWORD,
-            "Choose a password of at least 8 characters.",
-        )
+        raise AuthError(AuthErrorCode.INVALID_PASSWORD, message)
     if password.strip() != password or not password.strip():
-        raise AuthError(
-            AuthErrorCode.INVALID_PASSWORD,
-            "Choose a password of at least 8 characters.",
-        )
+        raise AuthError(AuthErrorCode.INVALID_PASSWORD, message)
+    if require_strong and not (
+        re.search(r"[A-Z]", password)
+        and re.search(r"[0-9]", password)
+        and re.search(r"[^A-Za-z0-9]", password)
+    ):
+        raise AuthError(AuthErrorCode.INVALID_PASSWORD, message)
     return password
 
 
@@ -162,7 +170,7 @@ class AuthService:
     def request_signup(self, *, email: str, display_name: str, password: str) -> IssuedOtp:
         normalized_email = _validate_email(email)
         name = _validate_display_name(display_name)
-        hashed = hash_password(_validate_password(password))
+        hashed = hash_password(_validate_password(password, require_strong=True))
         if self._repository.get_user_by_email(normalized_email) is not None:
             raise AuthError(
                 AuthErrorCode.ACCOUNT_EXISTS,
@@ -193,7 +201,7 @@ class AuthService:
 
     def request_reset_password(self, *, email: str, new_password: str) -> IssuedOtp:
         normalized_email = _validate_email(email)
-        _validate_password(new_password)
+        _validate_password(new_password, require_strong=True)
         existing = self._repository.get_user_by_email(normalized_email)
         if existing is None:
             raise AuthError(
@@ -223,7 +231,6 @@ class AuthService:
                 "That verification code has expired. Request a new one.",
             )
         if challenge.attempt_count >= MAX_OTP_ATTEMPTS:
-            self._repository.consume_otp(challenge.id)
             raise AuthError(
                 AuthErrorCode.OTP_LOCKED,
                 "Too many incorrect codes. Request a new one.",
@@ -237,7 +244,6 @@ class AuthService:
         if not hmac.compare_digest(expected, challenge.code_hash):
             attempts = self._repository.increment_otp_attempts(challenge.id)
             if attempts >= MAX_OTP_ATTEMPTS:
-                self._repository.consume_otp(challenge.id)
                 raise AuthError(
                     AuthErrorCode.OTP_LOCKED,
                     "Too many incorrect codes. Request a new one.",
@@ -270,8 +276,14 @@ class AuthService:
                 )
             if challenge.password_hash:
                 self._repository.update_password(existing.id, challenge.password_hash)
+                self._repository.revoke_user_sessions(existing.id)
             user = existing
-        return self._open_session(user)
+
+        changed = bool(challenge.password_hash) and challenge.purpose != "signup"
+        issued = self._open_session(user, password_changed=changed)
+        if changed:
+            self._repository.commit_password_reset()
+        return issued
 
     def user_for_token(self, token: str) -> UserAccount:
         if not token.strip():
@@ -404,7 +416,20 @@ class AuthService:
             delivery="on_screen" if reveal else "email",
         )
 
-    def _open_session(self, user: UserAccount) -> IssuedSession:
+    def send_password_changed_notice(self, email: str) -> None:
+        """Send a security notice after the reset request has committed."""
+        if self._mailer is not None:
+            try:
+                self._mailer.send_password_changed(to_email=email)
+            except SmtpMailError:
+                logger.warning("Password change notice could not be delivered")
+
+    def _open_session(
+        self,
+        user: UserAccount,
+        *,
+        password_changed: bool = False,
+    ) -> IssuedSession:
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(UTC) + timedelta(seconds=self._settings.session_ttl_seconds)
         self._repository.create_session(
@@ -412,4 +437,8 @@ class AuthService:
             token_hash=hash_secret(token),
             expires_at=expires_at,
         )
-        return IssuedSession(access_token=token, user=user)
+        return IssuedSession(
+            access_token=token,
+            user=user,
+            password_changed=password_changed,
+        )

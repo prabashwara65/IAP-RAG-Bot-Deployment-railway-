@@ -6,7 +6,7 @@ import { ChatMessage } from "./ChatMessage";
 import type { ChatTurn } from "./ChatMessage";
 import { ErrorNotice } from "./ErrorNotice";
 
-const TENANT_ID = "real";
+const TENANT_ID = "tenant-synthetic";
 
 interface Failure {
   kind: HrAskFailureKind;
@@ -37,6 +37,7 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
     if (isLoading) {
       return;
     }
+
     setFailure(null);
     setTurns((previous) => [
       ...previous,
@@ -56,9 +57,11 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
     } catch (error) {
       const kind =
         error instanceof HrAskError ? error.kind : "unexpected";
+
       if (kind === "unauthenticated") {
         onUnauthenticated();
       }
+
       setFailure(
         error instanceof HrAskError
           ? { kind: error.kind, correlationId: error.correlationId }
@@ -72,6 +75,16 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
   return (
     <main className="chat">
       <div className="chat__transcript" role="log" aria-label="Conversation">
+        {turns.length === 0 ? (
+          <section className="chat-welcome" aria-label="Get started">
+            <h2 className="chat-welcome__title">
+              Welcome to the HR assistant
+            </h2>
+            <p className="chat-welcome__description">
+              Ask a question about your workplace policies using the box below.
+            </p>
+          </section>
+        ) : null}
 
         {turns.map((turn) => (
           <ChatMessage key={turn.id} turn={turn} />

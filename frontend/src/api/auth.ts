@@ -38,11 +38,17 @@ export type AuthFailureKind =
 
 export class AuthApiError extends Error {
   readonly kind: AuthFailureKind;
+  readonly code: string | null;
 
-  constructor(kind: AuthFailureKind) {
-    super(`Auth request failed: ${kind}`);
+  constructor(
+    kind: AuthFailureKind,
+    message = AUTH_FAILURE_MESSAGES[kind],
+    code: string | null = null,
+  ) {
+    super(message);
     this.name = "AuthApiError";
     this.kind = kind;
+    this.code = code;
   }
 }
 
@@ -59,6 +65,9 @@ function failureKind(status: number): AuthFailureKind {
   if (status === 422 || status === 400) {
     return "invalid_request";
   }
+  if (status === 413) {
+    return "invalid_request";
+  }
   if (status === 429) {
     return "rate_limited";
   }
@@ -72,8 +81,48 @@ async function readJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch {
+    if (!response.ok) {
+      return null;
+    }
     throw new AuthApiError("unexpected");
   }
+}
+
+function serverErrorMessage(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null || !("error" in payload)) {
+    return null;
+  }
+  const error = payload.error;
+  if (typeof error !== "object" || error === null || !("message" in error)) {
+    return null;
+  }
+  return typeof error.message === "string" && error.message.trim()
+    ? error.message
+    : null;
+}
+
+function serverErrorCode(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null || !("error" in payload)) {
+    return null;
+  }
+  const error = payload.error;
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return null;
+  }
+  return typeof error.code === "string" && error.code.trim()
+    ? error.code
+    : null;
+}
+
+function authError(response: Response, payload: unknown): AuthApiError {
+  if (response.status >= 500) {
+    return new AuthApiError("unexpected");
+  }
+  return new AuthApiError(
+    failureKind(response.status),
+    response.status >= 400 ? (serverErrorMessage(payload) ?? undefined) : undefined,
+    response.status >= 400 ? serverErrorCode(payload) : null,
+  );
 }
 
 function isProfile(value: unknown): value is Profile {
@@ -137,7 +186,7 @@ async function postAuth(path: string, body: unknown): Promise<unknown> {
   }
   const payload = await readJson(response);
   if (!response.ok) {
-    throw new AuthApiError(failureKind(response.status));
+    throw authError(response, payload);
   }
   return payload;
 }
@@ -203,7 +252,7 @@ export async function fetchProfile(): Promise<Profile> {
   }
   const payload = await readJson(response);
   if (!response.ok) {
-    throw new AuthApiError(failureKind(response.status));
+    throw authError(response, payload);
   }
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
@@ -227,7 +276,7 @@ export async function updateProfile(patch: {
   }
   const payload = await readJson(response);
   if (!response.ok) {
-    throw new AuthApiError(failureKind(response.status));
+    throw authError(response, payload);
   }
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
@@ -252,7 +301,7 @@ export async function uploadAvatar(file: File): Promise<Profile> {
   }
   const payload = await readJson(response);
   if (!response.ok) {
-    throw new AuthApiError(failureKind(response.status));
+    throw authError(response, payload);
   }
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
@@ -272,7 +321,7 @@ export async function deleteAvatar(): Promise<Profile> {
   }
   const payload = await readJson(response);
   if (!response.ok) {
-    throw new AuthApiError(failureKind(response.status));
+    throw authError(response, payload);
   }
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
@@ -293,7 +342,8 @@ export async function fetchAvatarBlob(): Promise<Blob | null> {
     return null;
   }
   if (!response.ok) {
-    throw new AuthApiError(failureKind(response.status));
+    const payload = await readJson(response);
+    throw authError(response, payload);
   }
   return response.blob();
 }

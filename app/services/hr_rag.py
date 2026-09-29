@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
+from app.core.logging import get_logger
 from app.providers.embeddings import EmbeddingProvider
 from app.providers.llm import LLMProvider
 from app.repositories.embeddings import EmbeddingRepository
@@ -64,6 +65,7 @@ GROUNDING_SYSTEM_PROMPT = (
 )
 
 _CITATION_PATTERN = re.compile(r"\[S\d+\]")
+logger = get_logger("services.hr_rag")
 
 
 class HRRAGErrorCode(StrEnum):
@@ -308,7 +310,17 @@ def answer_hr_question(
             "The language model returned an empty response.",
         )
 
-    citations = _validated_citations(answer, context.sources)
+    try:
+        citations = _validated_citations(answer, context.sources)
+    except HRRAGError as error:
+        if error.code is not HRRAGErrorCode.UNKNOWN_CITATION_ID:
+            raise
+        logger.warning(
+            "HR answer cited a source that was not provided; "
+            "returning insufficient evidence"
+        )
+        return _insufficient_answer()
+
     if answer.casefold().startswith(INSUFFICIENT_EVIDENCE_ANSWER.casefold()):
         return HRGroundedAnswer(
             answer=answer,

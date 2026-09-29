@@ -40,6 +40,7 @@ export function App() {
     mode: "signup" | "login" | "reset";
     name: string;
     password: string;
+    email: string;
   } | null>(null);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -222,17 +223,21 @@ export function App() {
 
     return (
       <AuthScreen
+        initialEmail={otp?.email ?? ""}
+        initialMode={otp?.mode === "reset" ? "forgot" : otp?.mode ?? "signup"}
         onOtpIssued={(
           issued,
           mode,
           displayName,
           password,
+          email,
         ) => {
           setOtp({
             issued,
             mode,
             name: displayName,
             password,
+            email,
           });
 
           setScreen("otp");

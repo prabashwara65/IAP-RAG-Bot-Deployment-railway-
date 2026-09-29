@@ -10,11 +10,14 @@ import {
 import type { OtpIssued } from "../api/auth";
 
 interface AuthScreenProps {
+  initialEmail?: string;
+  initialMode?: "signup" | "login" | "forgot";
   onOtpIssued: (
     issued: OtpIssued,
     mode: "signup" | "login" | "reset",
     displayName: string,
     password: string,
+    email: string,
   ) => void;
 }
 
@@ -27,10 +30,10 @@ interface FieldErrors {
   confirmPassword?: string | undefined;
 }
 
-export function AuthScreen({ onOtpIssued }: AuthScreenProps) {
-  const [mode, setMode] = useState<AuthMode>("signup");
+export function AuthScreen({ initialEmail = "", initialMode = "signup", onOtpIssued }: AuthScreenProps) {
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -122,13 +125,13 @@ export function AuthScreen({ onOtpIssued }: AuthScreenProps) {
     try {
       if (mode === "signup") {
         const issued = await requestSignup(email.trim(), displayName.trim(), password);
-        onOtpIssued(issued, "signup", displayName.trim(), password);
+        onOtpIssued(issued, "signup", displayName.trim(), password, email);
       } else if (mode === "forgot") {
         const issued = await requestResetPassword(email.trim(), password);
-        onOtpIssued(issued, "reset", "", password);
+        onOtpIssued(issued, "reset", "", password, email);
       } else {
         const issued = await requestLogin(email.trim(), password);
-        onOtpIssued(issued, "login", displayName.trim(), password);
+        onOtpIssued(issued, "login", displayName.trim(), password, email);
       }
     } catch (error) {
       const kind = error instanceof AuthApiError ? error.kind : "unexpected";

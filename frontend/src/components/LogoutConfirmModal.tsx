@@ -66,13 +66,11 @@ export function LogoutConfirmModal({
           ×
         </button>
 
-
-
         <h2
           className="logout-modal__title"
           id="logout-modal-title"
         >
-          Log out ?
+          Logout ?
         </h2>
 
         <p
