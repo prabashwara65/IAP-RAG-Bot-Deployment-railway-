@@ -10,16 +10,25 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.dependencies import get_auth_service, get_bearer_token
 from app.core.rate_limit import enforce_rate_limit
-from app.schemas.common import ErrorDetail, ErrorResponse
 from app.schemas.auth import (
     LoginRequest,
+    LoginResponse,
     OtpIssuedResponse,
+    ProfileResponse,
     ResetPasswordRequest,
     SessionResponse,
     SignupRequest,
     VerifyOtpRequest,
 )
-from app.services.auth import AuthError, AuthErrorCode, AuthService, IssuedOtp, IssuedSession
+from app.schemas.common import ErrorDetail, ErrorResponse
+from app.services.auth import (
+    AuthError,
+    AuthErrorCode,
+    AuthService,
+    IssuedOtp,
+    IssuedSession,
+    LoginOutcome,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 _bearer = HTTPBearer(auto_error=False)
@@ -66,11 +75,36 @@ def _otp_response(issued: IssuedOtp) -> OtpIssuedResponse:
 
 
 def _session_response(issued: IssuedSession) -> SessionResponse:
-    from app.schemas.auth import ProfileResponse
-
     return SessionResponse(
         access_token=issued.access_token,
         user=ProfileResponse.from_account(issued.user),
+    )
+
+
+def _login_response(outcome: LoginOutcome) -> LoginResponse:
+    if outcome.kind == "session" and outcome.session is not None:
+        return LoginResponse(
+            next_step="session",
+            email=outcome.email,
+            access_token=outcome.session.access_token,
+            token_type="bearer",
+            user=ProfileResponse.from_account(outcome.session.user),
+        )
+    if outcome.kind == "totp":
+        return LoginResponse(next_step="totp", email=outcome.email)
+    issued = outcome.otp
+    if issued is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Sign-in could not be completed.",
+        )
+    return LoginResponse(
+        next_step="email_otp",
+        email=issued.email,
+        otp_sent=True,
+        expires_in_seconds=issued.expires_in_seconds,
+        otp_code=issued.otp_code,
+        delivery=issued.delivery,
     )
 
 
@@ -113,18 +147,18 @@ def signup(
 
 @router.post(
     "/login",
-    response_model=OtpIssuedResponse,
+    response_model=LoginResponse,
     dependencies=[Depends(enforce_rate_limit)],
 )
 def login(
     payload: LoginRequest,
     auth: Annotated[AuthService, Depends(get_auth_service)],
-) -> OtpIssuedResponse:
+) -> LoginResponse:
     try:
-        issued = auth.request_login(email=payload.email, password=payload.password)
+        outcome = auth.request_login(email=payload.email, password=payload.password)
     except AuthError as error:
         _fail(error)
-    return _otp_response(issued)
+    return _login_response(outcome)
 
 
 @router.post(
@@ -170,6 +204,30 @@ def verify(
         _fail(error)
     if issued.password_changed:
         background_tasks.add_task(auth.send_password_changed_notice, issued.user.email)
+    return _session_response(issued)
+
+
+@router.post(
+    "/verify-totp",
+    response_model=SessionResponse,
+    dependencies=[Depends(enforce_rate_limit)],
+)
+def verify_totp(
+    payload: VerifyOtpRequest,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    request: Request,
+) -> SessionResponse | JSONResponse:
+    try:
+        issued = auth.verify_totp(email=payload.email, code=payload.code)
+    except AuthError as error:
+        if error.code in {
+            AuthErrorCode.INVALID_OTP,
+            AuthErrorCode.OTP_LOCKED,
+            AuthErrorCode.OTP_EXPIRED,
+            AuthErrorCode.OTP_NOT_FOUND,
+        }:
+            return _otp_failure_response(request, error)
+        _fail(error)
     return _session_response(issued)
 
 

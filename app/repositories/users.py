@@ -11,6 +11,7 @@ from app.domain.accounts import (
     OtpPurpose,
     SessionRecord,
     ThemePreference,
+    TwoFactorMethod,
     UserAccount,
 )
 
@@ -42,6 +43,19 @@ class UserAccountRepository(Protocol):
     ) -> UserAccount: ...
 
     def update_password(self, user_id: UUID, password_hash: str) -> None: ...
+
+    def get_totp_material(self, user_id: UUID) -> tuple[str | None, str | None]: ...
+
+    def set_two_factor(
+        self,
+        user_id: UUID,
+        *,
+        method: TwoFactorMethod,
+        totp_secret: str | None = None,
+        totp_pending_secret: str | None = None,
+        clear_totp_secret: bool = False,
+        clear_pending_secret: bool = False,
+    ) -> UserAccount: ...
 
     def create_otp(
         self,

@@ -10,6 +10,7 @@ from app.domain.accounts import (
     OtpPurpose,
     SessionRecord,
     ThemePreference,
+    TwoFactorMethod,
     UserAccount,
 )
 
@@ -18,6 +19,8 @@ class MemoryUserAccountRepository:
     def __init__(self) -> None:
         self.users: dict[UUID, UserAccount] = {}
         self.password_hashes: dict[UUID, str] = {}
+        self.totp_secrets: dict[UUID, str | None] = {}
+        self.totp_pending: dict[UUID, str | None] = {}
         self.otps: dict[UUID, OtpChallenge] = {}
         self.sessions: dict[str, SessionRecord] = {}
 
@@ -74,6 +77,47 @@ class MemoryUserAccountRepository:
             theme=user.theme if theme is None else theme,
             avatar_path=None if clear_avatar else path,
             created_at=user.created_at,
+            two_factor_method=user.two_factor_method,
+        )
+        self.users[user_id] = updated
+        return updated
+
+    def get_totp_material(self, user_id: UUID) -> tuple[str | None, str | None]:
+        if user_id not in self.users:
+            raise LookupError("user_not_found")
+        return self.totp_secrets.get(user_id), self.totp_pending.get(user_id)
+
+    def set_two_factor(
+        self,
+        user_id: UUID,
+        *,
+        method: TwoFactorMethod,
+        totp_secret: str | None = None,
+        totp_pending_secret: str | None = None,
+        clear_totp_secret: bool = False,
+        clear_pending_secret: bool = False,
+    ) -> UserAccount:
+        user = self.users[user_id]
+        secret = self.totp_secrets.get(user_id)
+        pending = self.totp_pending.get(user_id)
+        if clear_totp_secret:
+            secret = None
+        elif totp_secret is not None:
+            secret = totp_secret
+        if clear_pending_secret:
+            pending = None
+        elif totp_pending_secret is not None:
+            pending = totp_pending_secret
+        self.totp_secrets[user_id] = secret
+        self.totp_pending[user_id] = pending
+        updated = UserAccount(
+            id=user.id,
+            email=user.email,
+            display_name=user.display_name,
+            theme=user.theme,
+            avatar_path=user.avatar_path,
+            created_at=user.created_at,
+            two_factor_method=method,
         )
         self.users[user_id] = updated
         return updated

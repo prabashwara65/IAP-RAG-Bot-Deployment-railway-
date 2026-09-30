@@ -37,7 +37,7 @@ export function App() {
 
   const [otp, setOtp] = useState<{
     issued: OtpIssued;
-    mode: "signup" | "login" | "reset";
+    mode: "signup" | "login" | "reset" | "totp";
     name: string;
     password: string;
     email: string;
@@ -224,7 +224,7 @@ export function App() {
     return (
       <AuthScreen
         initialEmail={otp?.email ?? ""}
-        initialMode={otp?.mode === "reset" ? "forgot" : otp?.mode ?? "signup"}
+        initialMode={otp?.mode === "reset" ? "forgot" : otp?.mode === "login" ? "login" : "signup"}
         onOtpIssued={(
           issued,
           mode,
@@ -241,6 +241,12 @@ export function App() {
           });
 
           setScreen("otp");
+        }}
+        onSignedIn={(profile) => {
+          setUser(profile);
+          applyTheme(profile.theme);
+          setScreen("chat");
+          void loadAvatar(profile);
         }}
       />
     );

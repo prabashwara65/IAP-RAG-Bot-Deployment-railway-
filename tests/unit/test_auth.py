@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pyotp
 import pytest
 from pydantic import SecretStr
 
@@ -144,9 +145,11 @@ def test_login_issues_email_otp_after_the_password(tmp_path: Path) -> None:
 
     login = service.request_login(email="ada@example.com", password=PASSWORD)
 
-    assert login.delivery == "on_screen"
-    assert login.otp_code is not None
-    session = service.verify_otp(email="ada@example.com", code=login.otp_code)
+    assert login.kind == "email_otp"
+    assert login.otp is not None
+    assert login.otp.delivery == "on_screen"
+    assert login.otp.otp_code is not None
+    session = service.verify_otp(email="ada@example.com", code=login.otp.otp_code)
     assert session.user.email == "ada@example.com"
 
 
@@ -294,7 +297,9 @@ def test_reset_password_updates_password(tmp_path: Path) -> None:
         email="ada@example.com",
         password=new_password,
     )
-    assert login_issued.otp_code is not None
+    assert login_issued.kind == "email_otp"
+    assert login_issued.otp is not None
+    assert login_issued.otp.otp_code is not None
 
     # Login with old password fails
     with pytest.raises(AuthError) as error:
@@ -310,3 +315,81 @@ def test_reset_password_unknown_email_rejected(tmp_path: Path) -> None:
             new_password="BrandNewPassword123!",
         )
     assert error.value.code is AuthErrorCode.ACCOUNT_NOT_FOUND
+
+
+def _verified_account(tmp_path: Path) -> tuple[AuthService, MemoryUserAccountRepository]:
+    service, store = _service(tmp_path)
+    issued = service.request_signup(
+        email="ada@example.com",
+        display_name="Ada",
+        password=PASSWORD,
+    )
+    assert issued.otp_code is not None
+    service.verify_otp(email="ada@example.com", code=issued.otp_code)
+    return service, store
+
+
+def test_turning_two_factor_off_signs_in_with_the_password_only(tmp_path: Path) -> None:
+    service, store = _verified_account(tmp_path)
+    user = store.get_user_by_email("ada@example.com")
+    assert user is not None
+    updated = service.set_two_factor_method(user, "none")
+    assert updated.two_factor_method == "none"
+
+    login = service.request_login(email="ada@example.com", password=PASSWORD)
+    assert login.kind == "session"
+    assert login.session is not None
+    assert login.session.user.two_factor_method == "none"
+
+
+def test_authenticator_replaces_email_and_only_one_method_stays_on(tmp_path: Path) -> None:
+    service, store = _verified_account(tmp_path)
+    user = store.get_user_by_email("ada@example.com")
+    assert user is not None
+    setup = service.begin_totp_setup(user)
+    assert setup.qr_svg.startswith("<svg")
+    assert setup.secret in setup.otpauth_uri
+    still_email = store.get_user_by_email("ada@example.com")
+    assert still_email is not None
+    assert still_email.two_factor_method == "email_otp"
+
+    enabled = service.confirm_totp_setup(still_email, pyotp.TOTP(setup.secret).now())
+    assert enabled.two_factor_method == "totp"
+    active, pending = store.get_totp_material(enabled.id)
+    assert active == setup.secret
+    assert pending is None
+
+    login = service.request_login(email="ada@example.com", password=PASSWORD)
+    assert login.kind == "totp"
+    assert login.otp is None
+    session = service.verify_totp(
+        email="ada@example.com",
+        code=pyotp.TOTP(setup.secret).now(),
+    )
+    assert session.user.two_factor_method == "totp"
+
+    email_only = service.set_two_factor_method(session.user, "email_otp")
+    assert email_only.two_factor_method == "email_otp"
+    active_after, pending_after = store.get_totp_material(email_only.id)
+    assert active_after is None
+    assert pending_after is None
+    switched = service.request_login(email="ada@example.com", password=PASSWORD)
+    assert switched.kind == "email_otp"
+
+
+def test_wrong_authenticator_code_is_rejected(tmp_path: Path) -> None:
+    service, store = _verified_account(tmp_path)
+    user = store.get_user_by_email("ada@example.com")
+    assert user is not None
+    setup = service.begin_totp_setup(user)
+    with pytest.raises(AuthError) as error:
+        service.confirm_totp_setup(user, "000000")
+    assert error.value.code is AuthErrorCode.INVALID_OTP
+
+    fresh = store.get_user_by_email("ada@example.com")
+    assert fresh is not None
+    service.confirm_totp_setup(fresh, pyotp.TOTP(setup.secret).now())
+    service.request_login(email="ada@example.com", password=PASSWORD)
+    with pytest.raises(AuthError) as login_error:
+        service.verify_totp(email="ada@example.com", code="000000")
+    assert login_error.value.code is AuthErrorCode.INVALID_OTP
