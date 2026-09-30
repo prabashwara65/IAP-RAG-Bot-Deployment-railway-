@@ -250,6 +250,28 @@ async def test_the_tenant_from_the_request_reaches_retrieval() -> None:
 
     assert repository.search_similar_chunks.call_args.kwargs["tenant_id"] == "tenant-other"
     assert repository.search_similar_chunks.call_args.kwargs["top_k"] == 5
+    assert repository.search_similar_chunks.call_args.kwargs["document_type"] is None
+
+
+async def test_document_type_filter_reaches_retrieval() -> None:
+    repository = _repository((_record(),))
+    application = _application(
+        embedding_provider=_StubEmbeddingProvider(),
+        llm_provider=_StubLLMProvider(),
+        repository=repository,
+    )
+
+    response = await _ask(
+        application,
+        payload={
+            "question": QUESTION,
+            "tenant_id": TENANT_ID,
+            "document_type": "CV",
+        },
+    )
+
+    assert response.status_code == 200
+    assert repository.search_similar_chunks.call_args.kwargs["document_type"] == "CV"
 
 
 async def test_no_supporting_evidence_is_a_successful_response() -> None:

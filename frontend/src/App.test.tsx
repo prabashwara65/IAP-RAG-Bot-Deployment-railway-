@@ -157,6 +157,29 @@ describe("conversation", () => {
     });
   });
 
+  it("sends the selected document type with the question", async () => {
+    mockSequence(LEAVE_ANSWER);
+    await renderChat();
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/search document type/i), "CV");
+
+    await user.type(
+      screen.getByLabelText(/^your question$/i),
+      "Find information in CV documents.",
+    );
+    await user.click(sendButton());
+
+    await screen.findByText(LEAVE_ANSWER_VISIBLE);
+    const askCall = vi.mocked(fetch).mock.calls.find(([url]) =>
+      String(url).includes("/hr/ask"),
+    ) as [string, RequestInit];
+    expect(JSON.parse(String(askCall[1].body))).toEqual({
+      question: "Find information in CV documents.",
+      tenant_id: "tenant-synthetic",
+      document_type: "CV",
+    });
+  });
+
   it("shows the first user message and the first assistant response", async () => {
     mockSequence(LEAVE_ANSWER);
     await renderChat();

@@ -14,7 +14,12 @@ from app.domain.documents import (
 
 class DocumentRepository(Protocol):
     def create_document(
-        self, *, tenant_id: str, document_key: str, title: str
+        self,
+        *,
+        tenant_id: str,
+        document_key: str,
+        title: str,
+        document_type: str = "Other",
     ) -> DocumentRecord: ...
 
     def get_document(self, document_id: UUID) -> DocumentRecord | None: ...

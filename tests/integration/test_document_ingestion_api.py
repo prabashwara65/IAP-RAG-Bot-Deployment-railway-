@@ -33,11 +33,13 @@ async def _upload(
     application: FastAPI,
     filename: str,
     content: bytes,
+    document_type: str = "Other",
 ) -> Response:
     transport = ASGITransport(app=application)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         return await client.post(
             UPLOAD_PATH,
+            data={"document_type": document_type},
             files={"file": (filename, content, "application/octet-stream")},
         )
 
@@ -47,17 +49,21 @@ async def test_upload_returns_persisted_chunk_preview(monkeypatch) -> None:
         "app.api.routes.documents.persist_ingested_document",
         lambda *args, **kwargs: PersistedIngestedDocument(
             document_key="UPLOAD-TEST",
+            document_type="CV",
             version_id=uuid4(),
             version_status=DocumentVersionStatus.CANDIDATE,
             chunk_count=2,
         ),
     )
-    response = await _upload(_application(), "guide.txt", b"First part.\n\nSecond part.")
+    response = await _upload(
+        _application(), "guide.txt", b"First part.\n\nSecond part.", "CV"
+    )
 
     assert response.status_code == 200
     body: dict[str, Any] = response.json()
     assert body["filename"] == "guide.txt"
     assert body["document_key"] == "UPLOAD-TEST"
+    assert body["document_type"] == "CV"
     assert body["version_status"] == "candidate"
     assert body["chunk_count"] == 2
     assert [chunk["content_text"] for chunk in body["chunks"]] == [

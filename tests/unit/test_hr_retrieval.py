@@ -125,7 +125,22 @@ def test_repository_receives_tenant_top_k_model_and_query_vector() -> None:
         top_k=3,
         model_name="synthetic-model",
         model_version="2.1.0",
+        document_type=None,
     )
+
+
+def test_optional_document_type_is_forwarded_to_repository() -> None:
+    repository = _repository()
+
+    retrieve_hr_chunks(
+        query="synthetic query",
+        tenant_id=TENANT_ID,
+        provider=_provider(),
+        repository=repository,
+        document_type="CV",
+    )
+
+    assert repository.search_similar_chunks.call_args.kwargs["document_type"] == "CV"
 
 
 def test_default_top_k_is_applied() -> None:

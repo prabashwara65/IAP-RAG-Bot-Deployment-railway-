@@ -205,6 +205,32 @@ html[data-theme="dark"] body {
   margin: 0.2rem 0 0;
 }
 
+.document-upload__type-label,
+.chat__type-filter {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  gap: 0.45rem;
+}
+
+.document-upload__type-label select,
+.chat__type-filter select {
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  max-width: 100%;
+  padding: 0.45rem 0.6rem;
+}
+
+.chat__type-filter {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
 .document-upload__status,
 .document-upload__key {
   font-size: 0.8rem;

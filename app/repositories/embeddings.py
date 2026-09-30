@@ -26,12 +26,14 @@ class EmbeddingRepository(Protocol):
         top_k: int,
         model_name: str,
         model_version: str,
+        document_type: str | None = None,
     ) -> Sequence[SemanticSearchRecord]:
         """Return the closest chunks for one tenant, closest first.
 
         Implementations must restrict the search to the supplied tenant, to
         active document versions, and to active embedding sets whose model
         name, model version, and dimension match the query. Ordering must be stable
-        for equal distances. No database expression may cross this boundary.
+        for equal distances. ``document_type`` optionally restricts matching
+        documents. No database expression may cross this boundary.
         """
         ...

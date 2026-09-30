@@ -6,6 +6,8 @@ import { ChatMessage } from "./ChatMessage";
 import type { ChatTurn } from "./ChatMessage";
 import { ErrorNotice } from "./ErrorNotice";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
+import { DOCUMENT_TYPES } from "../api/documents";
+import type { DocumentType } from "../api/documents";
 
 const TENANT_ID = "tenant-synthetic";
 
@@ -22,6 +24,7 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  const [documentType, setDocumentType] = useState<DocumentType | "">("");
   const endOfTranscript = useRef<HTMLDivElement>(null);
   const nextTurnId = useRef(0);
 
@@ -50,6 +53,7 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
       const response = await askHrQuestion({
         question,
         tenant_id: TENANT_ID,
+        ...(documentType === "" ? {} : { document_type: documentType }),
       });
       setTurns((previous) => [
         ...previous,
@@ -108,6 +112,18 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
       </div>
 
       <DocumentUploadPanel onUnauthenticated={onUnauthenticated} />
+      <label className="chat__type-filter">
+        Search document type
+        <select
+          aria-label="Search document type"
+          disabled={isLoading}
+          onChange={(event) => setDocumentType(event.target.value as DocumentType | "")}
+          value={documentType}
+        >
+          <option value="">All types</option>
+          {DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+        </select>
+      </label>
       <ChatComposer
         isLoading={isLoading}
         onAsk={(question) => {

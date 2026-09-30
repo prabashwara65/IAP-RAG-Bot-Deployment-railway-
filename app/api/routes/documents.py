@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_embedding_provider, get_session
@@ -16,12 +25,14 @@ from app.schemas.document_ingestion import (
     DocumentChunkResponse,
     DocumentIngestionResponse,
 )
+from app.schemas.hr_documents import DocumentType
 from app.services.document_ingestion import (
     DocumentIngestionError,
     DocumentIngestionErrorCode,
     ingest_document,
     persist_ingested_document,
 )
+
 router = APIRouter(
     prefix="/documents",
     tags=["documents"],
@@ -30,8 +41,8 @@ router = APIRouter(
 
 _ERROR_STATUS = {
     DocumentIngestionErrorCode.UNSUPPORTED_FORMAT: status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-    DocumentIngestionErrorCode.INVALID_DOCUMENT: status.HTTP_422_UNPROCESSABLE_ENTITY,
-    DocumentIngestionErrorCode.EMPTY_DOCUMENT: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    DocumentIngestionErrorCode.INVALID_DOCUMENT: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    DocumentIngestionErrorCode.EMPTY_DOCUMENT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     DocumentIngestionErrorCode.INVALID_MAX_CHUNK_CHARS: status.HTTP_500_INTERNAL_SERVER_ERROR,
     DocumentIngestionErrorCode.PARSER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
@@ -41,6 +52,7 @@ _ERROR_STATUS = {
 async def upload_document(
     request: Request,
     file: Annotated[UploadFile, File()],
+    document_type: Annotated[DocumentType, Form()],
     session: Annotated[Session, Depends(get_session)],
     embedding_provider: Annotated[EmbeddingProvider, Depends(get_embedding_provider)],
 ) -> DocumentIngestionResponse:
@@ -68,6 +80,7 @@ async def upload_document(
             content=content,
             document=ingested,
             embedding_provider=embedding_provider,
+            document_type=document_type.value,
         )
     except GeminiEmbeddingError as error:
         raise HTTPException(
@@ -77,6 +90,7 @@ async def upload_document(
 
     return DocumentIngestionResponse(
         filename=ingested.filename,
+        document_type=document_type.value,
         document_key=persisted.document_key,
         version_id=persisted.version_id,
         version_status=persisted.version_status.value,

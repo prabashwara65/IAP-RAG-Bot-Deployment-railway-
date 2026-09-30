@@ -57,10 +57,12 @@ def load_hr_evaluation_corpus(
     chunk_count = 0
 
     for document in documents:
+        metadata_document_type = getattr(document.metadata, "document_type", "Other")
         document_model = DocumentModel(
             tenant_id=tenant_id,
             document_key=document.document_key,
             title=document.metadata.document_title,
+            document_type=getattr(metadata_document_type, "value", metadata_document_type),
         )
         session.add(document_model)
         session.flush()

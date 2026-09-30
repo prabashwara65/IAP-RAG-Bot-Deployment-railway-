@@ -1,6 +1,31 @@
 import { apiBaseUrl, authHeaders } from "./http";
 
 const INGEST_PATH = "/api/v1/documents/ingest";
+export const DOCUMENT_TYPES = [
+  "Policy",
+  "Procedure",
+  "Company Profile",
+  "Organization Structure",
+  "Department Directory",
+  "Employee Responsibility Directory",
+  "Responsibility Matrix",
+  "Approval Matrix",
+  "Escalation Matrix",
+  "FAQ",
+  "Technical Guideline",
+  "Contact Directory",
+  "Project Proposal",
+  "Proposal",
+  "CV",
+  "Resume",
+  "Report",
+  "Meeting Notes",
+  "Requirements",
+  "Contract",
+  "Invoice",
+  "Other",
+] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 export interface DocumentChunk {
   chunk_index: number;
@@ -10,6 +35,7 @@ export interface DocumentChunk {
 
 export interface DocumentIngestionResult {
   filename: string;
+  document_type: DocumentType;
   document_key: string;
   version_id: string;
   version_status: string;
@@ -42,6 +68,8 @@ function isDocumentIngestionResult(value: unknown): value is DocumentIngestionRe
   const candidate = value as Partial<DocumentIngestionResult>;
   return (
     typeof candidate.filename === "string" &&
+    typeof candidate.document_type === "string" &&
+    DOCUMENT_TYPES.includes(candidate.document_type as DocumentType) &&
     typeof candidate.document_key === "string" &&
     typeof candidate.version_id === "string" &&
     typeof candidate.version_status === "string" &&
@@ -65,9 +93,13 @@ function failureKindForStatus(status: number): DocumentUploadFailureKind {
   return "unexpected";
 }
 
-export async function uploadDocument(file: File): Promise<DocumentIngestionResult> {
+export async function uploadDocument(
+  file: File,
+  documentType: DocumentType,
+): Promise<DocumentIngestionResult> {
   const form = new FormData();
   form.append("file", file);
+  form.append("document_type", documentType);
 
   let response: Response;
   try {

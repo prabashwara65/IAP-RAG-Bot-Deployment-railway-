@@ -13,6 +13,7 @@ class DocumentChunkResponse(BaseModel):
 
 class DocumentIngestionResponse(BaseModel):
     filename: str
+    document_type: str
     document_key: str
     version_id: UUID
     version_status: str

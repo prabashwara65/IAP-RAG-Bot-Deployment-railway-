@@ -237,6 +237,7 @@ def test_existing_semantic_retrieval_is_used_with_the_supplied_arguments() -> No
         top_k=3,
         model_name="stub-embedding-provider",
         model_version="0.0.1",
+        document_type=None,
     )
 
 

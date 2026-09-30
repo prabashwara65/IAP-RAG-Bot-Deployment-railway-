@@ -8,7 +8,7 @@ measured by scripts/hr_rag_evaluation.py against the real models.
 """
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 
 from app.core.database import create_session_factory, session_scope
 from app.evaluation.corpus import load_hr_evaluation_corpus
@@ -25,6 +25,7 @@ from app.evaluation.metrics import (
     score_retrieval,
 )
 from app.evaluation.runner import evaluate_hr_rag, render_hr_evaluation_report
+from app.models.documents import DocumentModel
 from app.providers.deterministic_embeddings import DeterministicEmbeddingProvider
 from app.providers.deterministic_llm import DeterministicLLMProvider
 from app.repositories.postgres.embeddings import PostgresEmbeddingRepository
@@ -59,6 +60,17 @@ def test_the_evaluation_corpus_is_published_through_the_real_pipeline(
             document.document_key for document in HR_EVALUATION_DOCUMENTS
         }
         assert all(corpus.chunk_texts_by_document_key.values())
+        stored_types = dict(
+            session.execute(
+                select(DocumentModel.document_key, DocumentModel.document_type).where(
+                    DocumentModel.tenant_id == TENANT_ID
+                )
+            ).all()
+        )
+        assert all(
+            stored_types[document.document_key] == document.metadata.document_type.value
+            for document in HR_EVALUATION_DOCUMENTS
+        )
 
 
 def test_an_exact_chunk_query_is_retrieved_first_from_its_own_document(

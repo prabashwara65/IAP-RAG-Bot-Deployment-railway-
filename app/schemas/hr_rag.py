@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.hr_documents import DocumentType
 from app.services.hr_rag import HRGroundedAnswer, HRSourceCitation
 
 MAX_QUESTION_LENGTH = 2000
@@ -27,6 +28,7 @@ class HRAskRequest(BaseModel):
 
     question: str = Field(min_length=1, max_length=MAX_QUESTION_LENGTH)
     tenant_id: str = Field(min_length=1, max_length=MAX_TENANT_ID_LENGTH)
+    document_type: DocumentType | None = None
 
 
 class HRAnswerCitation(BaseModel):
