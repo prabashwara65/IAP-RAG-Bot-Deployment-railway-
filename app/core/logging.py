@@ -24,6 +24,10 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "correlation_id": get_correlation_id(),
         }
+        for field in ("failure_code", "smtp_error_type"):
+            value = getattr(record, field, None)
+            if isinstance(value, str):
+                payload[field] = value
         if record.exc_info is not None:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload, ensure_ascii=False)

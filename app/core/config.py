@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = Field(default=1_209_600, ge=300, le=31_536_000)
     data_directory: Path = _REPOSITORY_ROOT / "data"
     avatar_max_bytes: int = Field(default=2_097_152, ge=1024, le=10_485_760)
+    document_max_bytes: int = Field(default=20_971_520, ge=1024, le=104_857_600)
     smtp_host: str = Field(default="smtp.gmail.com", min_length=1, max_length=255)
     smtp_port: int = Field(default=587, ge=1, le=65535)
     smtp_username: str | None = None

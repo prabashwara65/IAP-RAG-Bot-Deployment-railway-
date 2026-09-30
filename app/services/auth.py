@@ -398,6 +398,15 @@ class AuthService:
             try:
                 self._mailer.send_otp(to_email=email, code=code, purpose=purpose)
             except SmtpMailError as error:
+                logger.warning(
+                    "OTP email delivery failed",
+                    extra={
+                        "failure_code": AuthErrorCode.MAIL_DELIVERY_FAILED.value,
+                        "smtp_error_type": type(error.__cause__).__name__
+                        if error.__cause__ is not None
+                        else type(error).__name__,
+                    },
+                )
                 raise AuthError(
                     AuthErrorCode.MAIL_DELIVERY_FAILED,
                     "The verification email could not be sent. Try again shortly.",
