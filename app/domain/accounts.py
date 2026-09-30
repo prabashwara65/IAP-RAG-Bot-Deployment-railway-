@@ -8,9 +8,11 @@ from typing import Literal
 from uuid import UUID
 
 ThemePreference = Literal["light", "dark", "system"]
-OtpPurpose = Literal["signup", "login"]
+OtpPurpose = Literal["signup", "login", "totp_login"]
+TwoFactorMethod = Literal["none", "email_otp", "totp"]
 
 THEME_VALUES: tuple[ThemePreference, ...] = ("light", "dark", "system")
+TWO_FACTOR_METHODS: tuple[TwoFactorMethod, ...] = ("none", "email_otp", "totp")
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,7 @@ class UserAccount:
     theme: ThemePreference
     avatar_path: str | None
     created_at: datetime
+    two_factor_method: TwoFactorMethod = "email_otp"
 
 
 @dataclass(frozen=True)

@@ -2,6 +2,7 @@ import { apiBaseUrl, authHeaders, jsonHeaders } from "./http";
 import { setAccessToken } from "./session";
 
 export type ThemePreference = "light" | "dark" | "system";
+export type TwoFactorMethod = "none" | "email_otp" | "totp";
 
 export interface Profile {
   id: string;
@@ -9,8 +10,19 @@ export interface Profile {
   display_name: string;
   theme: ThemePreference;
   has_avatar: boolean;
-  two_factor_method?: string;
+  two_factor_method: TwoFactorMethod;
 }
+
+export interface TotpSetup {
+  secret: string;
+  otpauth_uri: string;
+  qr_svg: string;
+}
+
+export type LoginResult =
+  | { kind: "email_otp"; issued: OtpIssued }
+  | { kind: "totp"; email: string }
+  | { kind: "session"; session: SessionPayload };
 
 export interface OtpIssued {
   otp_sent: boolean;
@@ -141,6 +153,14 @@ function isProfile(value: unknown): value is Profile {
   );
 }
 
+function withTwoFactorMethod(value: Profile): Profile {
+  const method = (value as Partial<Profile>).two_factor_method;
+  if (method === "none" || method === "email_otp" || method === "totp") {
+    return value;
+  }
+  return { ...value, two_factor_method: "email_otp" };
+}
+
 function isOtpIssued(value: unknown): value is OtpIssued {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -159,6 +179,41 @@ function isOtpIssued(value: unknown): value is OtpIssued {
   }
   candidate.delivery = candidate.otp_code === null ? "email" : "on_screen";
   return true;
+}
+
+function isTotpSetup(value: unknown): value is TotpSetup {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as Partial<TotpSetup>;
+  return (
+    typeof candidate.secret === "string" &&
+    candidate.secret.length > 0 &&
+    typeof candidate.otpauth_uri === "string" &&
+    candidate.otpauth_uri.startsWith("otpauth://") &&
+    typeof candidate.qr_svg === "string" &&
+    candidate.qr_svg.trimStart().startsWith("<svg")
+  );
+}
+
+function parseLoginResult(value: unknown): LoginResult | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const candidate = value as { next_step?: string; email?: string };
+  if (candidate.next_step === "totp" && typeof candidate.email === "string") {
+    return { kind: "totp", email: candidate.email };
+  }
+  if (candidate.next_step === "session" && isSessionPayload(value)) {
+    return { kind: "session", session: { ...value, user: withTwoFactorMethod(value.user) } };
+  }
+  if (isOtpIssued(value)) {
+    return { kind: "email_otp", issued: value };
+  }
+  if (isSessionPayload(value)) {
+    return { kind: "session", session: { ...value, user: withTwoFactorMethod(value.user) } };
+  }
+  return null;
 }
 
 function isSessionPayload(value: unknown): value is SessionPayload {
@@ -207,15 +262,16 @@ export async function requestSignup(
   return payload;
 }
 
-export async function requestLogin(
-  email: string,
-  password: string,
-): Promise<OtpIssued> {
+export async function requestLogin(email: string, password: string): Promise<LoginResult> {
   const payload = await postAuth("/api/v1/auth/login", { email, password });
-  if (!isOtpIssued(payload)) {
+  const result = parseLoginResult(payload);
+  if (result === null) {
     throw new AuthApiError("unexpected");
   }
-  return payload;
+  if (result.kind === "session") {
+    setAccessToken(result.session.access_token);
+  }
+  return result;
 }
 
 export async function requestResetPassword(
@@ -238,7 +294,16 @@ export async function verifyOtp(email: string, code: string): Promise<SessionPay
     throw new AuthApiError("unexpected");
   }
   setAccessToken(payload.access_token);
-  return payload;
+  return { ...payload, user: withTwoFactorMethod(payload.user) };
+}
+
+export async function verifyTotp(email: string, code: string): Promise<SessionPayload> {
+  const payload = await postAuth("/api/v1/auth/verify-totp", { email, code });
+  if (!isSessionPayload(payload)) {
+    throw new AuthApiError("unexpected");
+  }
+  setAccessToken(payload.access_token);
+  return { ...payload, user: withTwoFactorMethod(payload.user) };
 }
 
 export async function fetchProfile(): Promise<Profile> {
@@ -257,7 +322,7 @@ export async function fetchProfile(): Promise<Profile> {
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
   }
-  return payload;
+  return withTwoFactorMethod(payload);
 }
 
 export async function updateProfile(patch: {
@@ -281,7 +346,7 @@ export async function updateProfile(patch: {
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
   }
-  return payload;
+  return withTwoFactorMethod(payload);
 }
 
 export async function uploadAvatar(file: File): Promise<Profile> {
@@ -306,7 +371,7 @@ export async function uploadAvatar(file: File): Promise<Profile> {
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
   }
-  return payload;
+  return withTwoFactorMethod(payload);
 }
 
 export async function deleteAvatar(): Promise<Profile> {
@@ -326,7 +391,56 @@ export async function deleteAvatar(): Promise<Profile> {
   if (!isProfile(payload)) {
     throw new AuthApiError("unexpected");
   }
+  return withTwoFactorMethod(payload);
+}
+
+async function postProfile(path: string, body: unknown): Promise<Profile> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl()}${path}`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new AuthApiError("network");
+  }
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new AuthApiError(failureKind(response.status));
+  }
+  if (!isProfile(payload)) {
+    throw new AuthApiError("unexpected");
+  }
+  return withTwoFactorMethod(payload);
+}
+
+export async function setTwoFactorMethod(method: "none" | "email_otp"): Promise<Profile> {
+  return postProfile("/api/v1/me/two-factor", { method });
+}
+
+export async function beginTotpSetup(): Promise<TotpSetup> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl()}/api/v1/me/two-factor/totp`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+  } catch {
+    throw new AuthApiError("network");
+  }
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new AuthApiError(failureKind(response.status));
+  }
+  if (!isTotpSetup(payload)) {
+    throw new AuthApiError("unexpected");
+  }
   return payload;
+}
+
+export async function confirmTotpSetup(code: string): Promise<Profile> {
+  return postProfile("/api/v1/me/two-factor/totp/confirm", { code });
 }
 
 export async function fetchAvatarBlob(): Promise<Blob | null> {

@@ -7,18 +7,19 @@ import {
   requestResetPassword,
   requestSignup,
 } from "../api/auth";
-import type { OtpIssued } from "../api/auth";
+import type { OtpIssued, Profile } from "../api/auth";
 
 interface AuthScreenProps {
   initialEmail?: string;
   initialMode?: "signup" | "login" | "forgot";
   onOtpIssued: (
     issued: OtpIssued,
-    mode: "signup" | "login" | "reset",
+    mode: "signup" | "login" | "reset" | "totp",
     displayName: string,
     password: string,
     email: string,
   ) => void;
+  onSignedIn: (user: Profile) => void;
 }
 
 type AuthMode = "signup" | "login" | "forgot";
@@ -30,7 +31,12 @@ interface FieldErrors {
   confirmPassword?: string | undefined;
 }
 
-export function AuthScreen({ initialEmail = "", initialMode = "signup", onOtpIssued }: AuthScreenProps) {
+export function AuthScreen({
+  initialEmail = "",
+  initialMode = "signup",
+  onOtpIssued,
+  onSignedIn,
+}: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState(initialEmail);
@@ -130,8 +136,26 @@ export function AuthScreen({ initialEmail = "", initialMode = "signup", onOtpIss
         const issued = await requestResetPassword(email.trim(), password);
         onOtpIssued(issued, "reset", "", password, email);
       } else {
-        const issued = await requestLogin(email.trim(), password);
-        onOtpIssued(issued, "login", displayName.trim(), password, email);
+        const result = await requestLogin(email.trim(), password);
+        if (result.kind === "session") {
+          onSignedIn(result.session.user);
+        } else if (result.kind === "totp") {
+          onOtpIssued(
+            {
+              otp_sent: true,
+              email: result.email,
+              expires_in_seconds: 600,
+              otp_code: null,
+              delivery: "email",
+            },
+            "totp",
+            displayName.trim(),
+            password,
+            email,
+          );
+        } else {
+          onOtpIssued(result.issued, "login", displayName.trim(), password, email);
+        }
       }
     } catch (error) {
       const kind = error instanceof AuthApiError ? error.kind : "unexpected";
@@ -178,7 +202,7 @@ export function AuthScreen({ initialEmail = "", initialMode = "signup", onOtpIss
           <p className="auth-card__lede">
             {mode === "forgot"
               ? "Enter your work email and a new password. We will email a verification code to confirm."
-              : "Sign in with your email and password. We then email a one-time code to your Gmail inbox as two-factor authentication."}
+              : "Sign in with your email and password. If two-factor authentication is on, confirm with an email code or your authenticator app."}
           </p>
         </header>
 

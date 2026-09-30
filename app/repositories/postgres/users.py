@@ -13,6 +13,7 @@ from app.domain.accounts import (
     OtpPurpose,
     SessionRecord,
     ThemePreference,
+    TwoFactorMethod,
     UserAccount,
 )
 from app.models.users import OtpChallengeModel, SessionModel, UserModel
@@ -20,6 +21,13 @@ from app.models.users import OtpChallengeModel, SessionModel, UserModel
 
 def _user_from_model(model: UserModel) -> UserAccount:
     theme: ThemePreference = model.theme  # type: ignore[assignment]
+    raw_method = model.two_factor_method
+    if raw_method == "none":
+        method: TwoFactorMethod = "none"
+    elif raw_method == "totp":
+        method = "totp"
+    else:
+        method = "email_otp"
     return UserAccount(
         id=model.id,
         email=model.email,
@@ -27,6 +35,7 @@ def _user_from_model(model: UserModel) -> UserAccount:
         theme=theme,
         avatar_path=model.avatar_path,
         created_at=model.created_at,
+        two_factor_method=method,
     )
 
 
@@ -84,6 +93,7 @@ class PostgresUserAccountRepository:
             display_name=display_name,
             theme=theme,
             password_hash=password_hash,
+            two_factor_method="email_otp",
         )
         self._session.add(model)
         self._session.flush()
@@ -109,6 +119,38 @@ class PostgresUserAccountRepository:
             model.avatar_path = None
         elif avatar_path is not None:
             model.avatar_path = avatar_path
+        model.updated_at = datetime.now(UTC)
+        self._session.flush()
+        return _user_from_model(model)
+
+    def get_totp_material(self, user_id: UUID) -> tuple[str | None, str | None]:
+        model = self._session.get(UserModel, user_id)
+        if model is None:
+            raise LookupError("user_not_found")
+        return model.totp_secret, model.totp_pending_secret
+
+    def set_two_factor(
+        self,
+        user_id: UUID,
+        *,
+        method: TwoFactorMethod,
+        totp_secret: str | None = None,
+        totp_pending_secret: str | None = None,
+        clear_totp_secret: bool = False,
+        clear_pending_secret: bool = False,
+    ) -> UserAccount:
+        model = self._session.get(UserModel, user_id)
+        if model is None:
+            raise LookupError("user_not_found")
+        model.two_factor_method = method
+        if clear_totp_secret:
+            model.totp_secret = None
+        elif totp_secret is not None:
+            model.totp_secret = totp_secret
+        if clear_pending_secret:
+            model.totp_pending_secret = None
+        elif totp_pending_secret is not None:
+            model.totp_pending_secret = totp_pending_secret
         model.updated_at = datetime.now(UTC)
         self._session.flush()
         return _user_from_model(model)
