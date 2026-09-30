@@ -13,9 +13,16 @@ from pathlib import Path
 
 from app.core.config import Settings
 from app.core.logging import get_logger
-from app.domain.accounts import THEME_VALUES, OtpPurpose, ThemePreference, UserAccount
+from app.domain.accounts import (
+    THEME_VALUES,
+    OtpPurpose,
+    ThemePreference,
+    TwoFactorMethod,
+    UserAccount,
+)
 from app.repositories.users import UserAccountRepository
 from app.services.mail import Mailer, SmtpMailError, mailer_from_settings
+from app.services.totp import new_totp_secret, provisioning_uri, qr_svg, totp_matches
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 OTP_LENGTH = 6
@@ -49,6 +56,8 @@ class AuthErrorCode(StrEnum):
     INVALID_AVATAR = "invalid_avatar"
     AVATAR_TOO_LARGE = "avatar_too_large"
     MAIL_DELIVERY_FAILED = "mail_delivery_failed"
+    INVALID_TWO_FACTOR = "invalid_two_factor"
+    TOTP_NOT_PENDING = "totp_not_pending"
 
 
 class AuthError(RuntimeError):
@@ -70,6 +79,23 @@ class IssuedSession:
     access_token: str
     user: UserAccount
     password_changed: bool = False
+
+
+@dataclass(frozen=True)
+class LoginOutcome:
+    """Password check result: email code, authenticator code, or a session."""
+
+    kind: str
+    email: str
+    otp: IssuedOtp | None = None
+    session: IssuedSession | None = None
+
+
+@dataclass(frozen=True)
+class TotpSetup:
+    secret: str
+    otpauth_uri: str
+    qr_svg: str
 
 
 def normalize_email(value: str) -> str:
@@ -129,7 +155,8 @@ def _validate_display_name(name: str) -> str:
 
 def _validate_password(password: str, *, require_strong: bool = False) -> str:
     message = (
-        "Password must be at least 8 characters and include a capital letter, a number, and a symbol."
+        "Password must be at least 8 characters and include a capital letter, "
+        "a number, and a symbol."
         if require_strong
         else "Choose a password of at least 8 characters."
     )
@@ -183,7 +210,7 @@ class AuthService:
             password_hash=hashed,
         )
 
-    def request_login(self, *, email: str, password: str) -> IssuedOtp:
+    def request_login(self, *, email: str, password: str) -> LoginOutcome:
         normalized_email = _validate_email(email)
         _validate_password(password)
         stored = self._repository.get_password_hash_by_email(normalized_email)
@@ -192,12 +219,28 @@ class AuthService:
                 AuthErrorCode.INVALID_CREDENTIALS,
                 "That email or password is not correct.",
             )
-        return self._issue_otp(
+        account = self._repository.get_user_by_email(normalized_email)
+        if account is None:
+            raise AuthError(
+                AuthErrorCode.INVALID_CREDENTIALS,
+                "That email or password is not correct.",
+            )
+        if account.two_factor_method == "none":
+            return LoginOutcome(
+                kind="session",
+                email=normalized_email,
+                session=self._open_session(account),
+            )
+        if account.two_factor_method == "totp":
+            self._issue_totp_login_gate(normalized_email)
+            return LoginOutcome(kind="totp", email=normalized_email)
+        issued = self._issue_otp(
             email=normalized_email,
             purpose="login",
             display_name=None,
             password_hash=None,
         )
+        return LoginOutcome(kind="email_otp", email=normalized_email, otp=issued)
 
     def request_reset_password(self, *, email: str, new_password: str) -> IssuedOtp:
         normalized_email = _validate_email(email)
@@ -229,6 +272,11 @@ class AuthService:
             raise AuthError(
                 AuthErrorCode.OTP_EXPIRED,
                 "That verification code has expired. Request a new one.",
+            )
+        if challenge.purpose == "totp_login":
+            raise AuthError(
+                AuthErrorCode.INVALID_OTP,
+                "Enter the code from your authenticator app.",
             )
         if challenge.attempt_count >= MAX_OTP_ATTEMPTS:
             raise AuthError(
@@ -285,6 +333,48 @@ class AuthService:
             self._repository.commit_password_reset()
         return issued
 
+    def verify_totp(self, *, email: str, code: str) -> IssuedSession:
+        normalized_email = _validate_email(email)
+        challenge = self._repository.latest_open_otp(normalized_email)
+        if challenge is None or challenge.purpose != "totp_login":
+            raise AuthError(
+                AuthErrorCode.OTP_NOT_FOUND,
+                "Sign in with your password before entering an authenticator code.",
+            )
+        if challenge.expires_at <= datetime.now(UTC):
+            self._repository.consume_otp(challenge.id)
+            raise AuthError(
+                AuthErrorCode.OTP_EXPIRED,
+                "That sign-in has expired. Enter your password again.",
+            )
+        if challenge.attempt_count >= MAX_OTP_ATTEMPTS:
+            self._repository.consume_otp(challenge.id)
+            raise AuthError(
+                AuthErrorCode.OTP_LOCKED,
+                "Too many incorrect codes. Sign in again.",
+            )
+        account = self._repository.get_user_by_email(normalized_email)
+        secret = None if account is None else self._repository.get_totp_material(account.id)[0]
+        if account is None or account.two_factor_method != "totp" or not secret:
+            raise AuthError(
+                AuthErrorCode.INVALID_OTP,
+                "That authenticator code is not correct.",
+            )
+        if not totp_matches(secret, code):
+            attempts = self._repository.increment_otp_attempts(challenge.id)
+            if attempts >= MAX_OTP_ATTEMPTS:
+                self._repository.consume_otp(challenge.id)
+                raise AuthError(
+                    AuthErrorCode.OTP_LOCKED,
+                    "Too many incorrect codes. Sign in again.",
+                )
+            raise AuthError(
+                AuthErrorCode.INVALID_OTP,
+                "That authenticator code is not correct.",
+            )
+        self._repository.consume_otp(challenge.id)
+        return self._open_session(account)
+
     def user_for_token(self, token: str) -> UserAccount:
         if not token.strip():
             raise AuthError(AuthErrorCode.UNAUTHENTICATED, "Sign in is required.")
@@ -322,6 +412,49 @@ class AuthService:
             user.id,
             display_name=name,
             theme=preference,
+        )
+
+    def set_two_factor_method(self, user: UserAccount, method: str) -> UserAccount:
+        if method not in {"none", "email_otp"}:
+            raise AuthError(
+                AuthErrorCode.INVALID_TWO_FACTOR,
+                "Choose email codes, or turn two-factor authentication off.",
+            )
+        chosen: TwoFactorMethod = "none" if method == "none" else "email_otp"
+        return self._repository.set_two_factor(
+            user.id,
+            method=chosen,
+            clear_totp_secret=True,
+            clear_pending_secret=True,
+        )
+
+    def begin_totp_setup(self, user: UserAccount) -> TotpSetup:
+        secret = new_totp_secret()
+        self._repository.set_two_factor(
+            user.id,
+            method=user.two_factor_method,
+            totp_pending_secret=secret,
+        )
+        uri = provisioning_uri(secret=secret, email=user.email)
+        return TotpSetup(secret=secret, otpauth_uri=uri, qr_svg=qr_svg(uri))
+
+    def confirm_totp_setup(self, user: UserAccount, code: str) -> UserAccount:
+        _active, pending = self._repository.get_totp_material(user.id)
+        if not pending or not totp_matches(pending, code):
+            if not pending:
+                raise AuthError(
+                    AuthErrorCode.TOTP_NOT_PENDING,
+                    "Start authenticator setup before confirming a code.",
+                )
+            raise AuthError(
+                AuthErrorCode.INVALID_OTP,
+                "That authenticator code is not correct.",
+            )
+        return self._repository.set_two_factor(
+            user.id,
+            method="totp",
+            totp_secret=pending,
+            clear_pending_secret=True,
         )
 
     def save_avatar(self, user: UserAccount, content: bytes, declared_type: str) -> UserAccount:
@@ -371,6 +504,17 @@ class AuthService:
         if not str(candidate).startswith(str(root)) or not candidate.is_file():
             return None
         return candidate
+
+    def _issue_totp_login_gate(self, email: str) -> None:
+        expires_at = datetime.now(UTC) + timedelta(seconds=self._settings.otp_ttl_seconds)
+        self._repository.create_otp(
+            email=email,
+            purpose="totp_login",
+            code_hash=hash_secret(secrets.token_urlsafe(16)),
+            expires_at=expires_at,
+            display_name=None,
+            password_hash=None,
+        )
 
     def _issue_otp(
         self,

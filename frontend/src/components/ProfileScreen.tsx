@@ -10,6 +10,7 @@ import {
 import type { Profile, ThemePreference } from "../api/auth";
 import { AvatarMark } from "./AvatarMark";
 import { ThemeToggle } from "./ThemeToggle";
+import { TwoFactorSettings } from "./TwoFactorSettings";
 
 interface ProfileScreenProps {
   user: Profile;
@@ -223,20 +224,12 @@ export function ProfileScreen({
           />
         </label>
 
-        <aside className="security-card">
-          <p className="security-card__label">
-            Two-factor authentication
-          </p>
-
-          <p className="security-card__title">
-            Email OTP via Gmail
-          </p>
-
-          <p className="security-card__hint">
-            After your password, we send a 6-digit code to {user.email}. This is
-            the only 2FA method for this account.
-          </p>
-        </aside>
+        <TwoFactorSettings
+          onMessage={setMessage}
+          onNotice={setNotice}
+          onUpdated={onUpdated}
+          user={user}
+        />
 
         <div className="field">
           <span className="field__label">

@@ -25,6 +25,10 @@ class UserModel(Base):
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email"),
         CheckConstraint("theme IN ('light', 'dark', 'system')", name="ck_users_theme"),
+        CheckConstraint(
+            "two_factor_method IN ('none', 'email_otp', 'totp')",
+            name="ck_users_two_factor_method",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -32,6 +36,11 @@ class UserModel(Base):
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
     theme: Mapped[str] = mapped_column(String(20), nullable=False, server_default="system")
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    two_factor_method: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="email_otp"
+    )
+    totp_secret: Mapped[str | None] = mapped_column(String(64))
+    totp_pending_secret: Mapped[str | None] = mapped_column(String(64))
     avatar_path: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -45,7 +54,7 @@ class OtpChallengeModel(Base):
     __tablename__ = "otp_challenges"
     __table_args__ = (
         CheckConstraint(
-            "purpose IN ('signup', 'login')",
+            "purpose IN ('signup', 'login', 'totp_login')",
             name="ck_otp_challenges_purpose",
         ),
     )

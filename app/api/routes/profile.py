@@ -9,7 +9,13 @@ from fastapi.responses import FileResponse
 
 from app.api.dependencies import get_auth_service, get_current_user
 from app.domain.accounts import UserAccount
-from app.schemas.auth import ProfileResponse, ProfileUpdateRequest
+from app.schemas.auth import (
+    ProfileResponse,
+    ProfileUpdateRequest,
+    TotpConfirmRequest,
+    TotpSetupResponse,
+    TwoFactorUpdateRequest,
+)
 from app.services.auth import AuthError, AuthErrorCode, AuthService
 
 router = APIRouter(prefix="/me", tags=["profile"])
@@ -29,6 +35,9 @@ def _fail(error: AuthError) -> NoReturn:
         AuthErrorCode.INVALID_THEME: status.HTTP_422_UNPROCESSABLE_ENTITY,
         AuthErrorCode.INVALID_AVATAR: status.HTTP_422_UNPROCESSABLE_ENTITY,
         AuthErrorCode.AVATAR_TOO_LARGE: 413,
+        AuthErrorCode.INVALID_OTP: status.HTTP_422_UNPROCESSABLE_ENTITY,
+        AuthErrorCode.INVALID_TWO_FACTOR: status.HTTP_422_UNPROCESSABLE_ENTITY,
+        AuthErrorCode.TOTP_NOT_PENDING: status.HTTP_422_UNPROCESSABLE_ENTITY,
     }
     raise HTTPException(
         status_code=mapping.get(error.code, status.HTTP_400_BAD_REQUEST),
@@ -55,6 +64,48 @@ def update_profile(
             display_name=payload.display_name,
             theme=payload.theme,
         )
+    except AuthError as error:
+        _fail(error)
+    return ProfileResponse.from_account(updated)
+
+
+@router.post("/two-factor", response_model=ProfileResponse)
+def update_two_factor(
+    payload: TwoFactorUpdateRequest,
+    user: Annotated[UserAccount, Depends(get_current_user)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+) -> ProfileResponse:
+    try:
+        updated = auth.set_two_factor_method(user, payload.method)
+    except AuthError as error:
+        _fail(error)
+    return ProfileResponse.from_account(updated)
+
+
+@router.post("/two-factor/totp", response_model=TotpSetupResponse)
+def begin_totp(
+    user: Annotated[UserAccount, Depends(get_current_user)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+) -> TotpSetupResponse:
+    try:
+        setup = auth.begin_totp_setup(user)
+    except AuthError as error:
+        _fail(error)
+    return TotpSetupResponse(
+        secret=setup.secret,
+        otpauth_uri=setup.otpauth_uri,
+        qr_svg=setup.qr_svg,
+    )
+
+
+@router.post("/two-factor/totp/confirm", response_model=ProfileResponse)
+def confirm_totp(
+    payload: TotpConfirmRequest,
+    user: Annotated[UserAccount, Depends(get_current_user)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+) -> ProfileResponse:
+    try:
+        updated = auth.confirm_totp_setup(user, payload.code)
     except AuthError as error:
         _fail(error)
     return ProfileResponse.from_account(updated)

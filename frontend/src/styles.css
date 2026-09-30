@@ -1016,6 +1016,142 @@ html[data-theme="dark"] body {
   margin: 0;
 }
 
+.security-card__head {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.switch {
+  background: var(--border);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  height: 1.7rem;
+  padding: 0.18rem;
+  width: 2.9rem;
+}
+
+.switch:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.switch.is-on {
+  background: var(--accent);
+}
+
+.switch__thumb {
+  background: #fff;
+  border-radius: 50%;
+  display: block;
+  height: 1.34rem;
+  transition: transform 0.15s ease;
+  width: 1.34rem;
+}
+
+.switch.is-on .switch__thumb {
+  transform: translateX(1.2rem);
+}
+
+.factor-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.factor-option {
+  align-items: flex-start;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  text-align: left;
+  width: 100%;
+}
+
+.factor-option.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.factor-option__mark {
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 1rem;
+  margin-top: 0.15rem;
+  width: 1rem;
+}
+
+.factor-option.is-selected .factor-option__mark {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+.factor-option__title,
+.factor-option__hint {
+  display: block;
+}
+
+.factor-option__title {
+  font-weight: 700;
+}
+
+.factor-option__hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.factor-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  width: 100%;
+}
+
+.factor-setup__center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.factor-setup__qr {
+  align-items: center;
+  background: #fff;
+  border-radius: 12px;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.factor-setup__qr svg {
+  display: block;
+  height: 180px;
+  width: 180px;
+}
+
+.factor-setup__secret {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
 .avatar {
   align-items: center;
   background: linear-gradient(135deg, var(--accent), #a855f7);

@@ -7,12 +7,13 @@ import {
   requestResetPassword,
   requestSignup,
   verifyOtp,
+  verifyTotp,
 } from "../api/auth";
 import type { OtpIssued, Profile } from "../api/auth";
 
 interface OtpScreenProps {
   issued: OtpIssued;
-  mode: "signup" | "login" | "reset";
+  mode: "signup" | "login" | "reset" | "totp";
   displayName: string;
   password: string;
   onVerified: (user: Profile) => void;
@@ -152,7 +153,10 @@ export function OtpScreen({
     setMessage(null);
 
     try {
-      const session = await verifyOtp(current.email, code.trim());
+      const session =
+        mode === "totp"
+          ? await verifyTotp(current.email, code.trim())
+          : await verifyOtp(current.email, code.trim());
       onVerified(session.user);
     } catch (error) {
       if (error instanceof AuthApiError && error.code === "INVALID_OTP") {
@@ -197,8 +201,13 @@ export function OtpScreen({
           ? await requestSignup(current.email, displayName, password)
           : mode === "reset"
             ? await requestResetPassword(current.email, password)
-            : await requestLogin(current.email, password);
-
+            : await (async () => {
+                const result = await requestLogin(current.email, password);
+                if (result.kind !== "email_otp") {
+                  throw new AuthApiError("unexpected");
+                }
+                return result.issued;
+              })();
       setCurrent(next);
       setLocked(false);
       setWrongAttempts(0);
@@ -266,7 +275,12 @@ export function OtpScreen({
           <p className="eyebrow">Two-Factor Security</p>
           <h1 className="auth-card__title">Enter your code</h1>
           <p className="auth-card__lede">
-            {emailed ? (
+            {mode === "totp" ? (
+              <>
+                Enter the 6-digit code from your authenticator app for{" "}
+                <strong>{current.email}</strong>.
+              </>
+            ) : emailed ? (
               <>
                 Check Gmail for a 6-digit code sent to{" "}
                 <strong>{current.email}</strong>. The code is valid for{" "}
@@ -306,7 +320,7 @@ export function OtpScreen({
             </button>
           </div>
 
-          {emailed || current.otp_code === null ? null : (
+          {mode === "totp" || emailed || current.otp_code === null ? null : (
             <aside className="otp-inbox" aria-live="polite">
               <p className="otp-inbox__label">Your verification code</p>
               <p className="otp-inbox__code">{current.otp_code}</p>
@@ -317,7 +331,7 @@ export function OtpScreen({
             </aside>
           )}
 
-          {emailed ? (
+          {mode === "totp" || !emailed ? null : (
             <aside className="otp-inbox" aria-live="polite">
               <p className="otp-inbox__label">Two-factor email</p>
               <p className="otp-inbox__hint">
@@ -326,7 +340,7 @@ export function OtpScreen({
                 configured.
               </p>
             </aside>
-          ) : null}
+          )}
 
           <form className="stack" onSubmit={handleSubmit}>
             <div className="field">
@@ -378,18 +392,18 @@ export function OtpScreen({
             >
               {busy ? "Checking…" : "Verify and continue"}
             </button>
-            <button
-              className="btn btn--ghost"
-              disabled={busy || cooldown > 0}
-              onClick={() => {
-                void resend();
-              }}
-              type="button"
-            >
-              {cooldown > 0
-                ? `Resend code in ${cooldown}s`
-                : "Resend code"}
-            </button>
+            {mode === "totp" ? null : (
+              <button
+                className="btn btn--ghost"
+                disabled={busy || cooldown > 0}
+                onClick={() => {
+                  void resend();
+                }}
+                type="button"
+              >
+                {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+              </button>
+            )}
           </form>
         </section>
 
