@@ -1,7 +1,7 @@
 """Add generic document type metadata and tenant/type index.
 
-Revision ID: 0004_document_type
-Revises: 0003_smtp_otp_passwords
+Revision ID: 0005_document_type
+Revises: 0004_totp_two_factor
 Create Date: 2026-09-30
 """
 
@@ -10,8 +10,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0004_document_type"
-down_revision: str | None = "0003_smtp_otp_passwords"
+revision: str = "0005_document_type"
+down_revision: str | None = "0004_totp_two_factor"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
