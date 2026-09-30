@@ -5,6 +5,7 @@ import { ChatComposer } from "./ChatComposer";
 import { ChatMessage } from "./ChatMessage";
 import type { ChatTurn } from "./ChatMessage";
 import { ErrorNotice } from "./ErrorNotice";
+import { DocumentUploadPanel } from "./DocumentUploadPanel";
 
 const TENANT_ID = "tenant-synthetic";
 
@@ -106,6 +107,7 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
         <div ref={endOfTranscript} />
       </div>
 
+      <DocumentUploadPanel onUnauthenticated={onUnauthenticated} />
       <ChatComposer
         isLoading={isLoading}
         onAsk={(question) => {
