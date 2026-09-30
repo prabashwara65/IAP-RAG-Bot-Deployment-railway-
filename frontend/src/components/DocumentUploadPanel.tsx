@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { DocumentUploadError, uploadDocument } from "../api/documents";
-import type { DocumentIngestionResult, DocumentUploadFailureKind } from "../api/documents";
+import { DOCUMENT_TYPES, DocumentUploadError, uploadDocument } from "../api/documents";
+import type { DocumentIngestionResult, DocumentType, DocumentUploadFailureKind } from "../api/documents";
 
 interface DocumentUploadPanelProps {
   onUnauthenticated: () => void;
@@ -20,6 +20,7 @@ export function DocumentUploadPanel({ onUnauthenticated }: DocumentUploadPanelPr
   const [result, setResult] = useState<DocumentIngestionResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [documentType, setDocumentType] = useState<DocumentType>("Other");
 
   async function handleFile(file: File | undefined) {
     if (file === undefined) return;
@@ -28,7 +29,7 @@ export function DocumentUploadPanel({ onUnauthenticated }: DocumentUploadPanelPr
     setResult(null);
     setErrorMessage(null);
     try {
-      setResult(await uploadDocument(file));
+      setResult(await uploadDocument(file, documentType));
     } catch (error) {
       const kind = error instanceof DocumentUploadError ? error.kind : "unexpected";
       if (kind === "unauthenticated") onUnauthenticated();
@@ -46,6 +47,17 @@ export function DocumentUploadPanel({ onUnauthenticated }: DocumentUploadPanelPr
           <h2 id="document-upload-title">Read and chunk a document</h2>
           <p>TXT, Markdown, PDF, or DOCX · up to 20 MB</p>
         </div>
+        <label className="document-upload__type-label">
+          Document type
+          <select
+            aria-label="Document type for upload"
+            disabled={isUploading}
+            onChange={(event) => setDocumentType(event.target.value as DocumentType)}
+            value={documentType}
+          >
+            {DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </label>
         <label className="document-upload__button">
           <input
             accept=".txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -66,7 +78,7 @@ export function DocumentUploadPanel({ onUnauthenticated }: DocumentUploadPanelPr
             {result.filename} <span>{result.chunk_count} {result.chunk_count === 1 ? "chunk" : "chunks"}</span>
           </p>
           <p className="document-upload__status" role="status">
-            Stored in the vector database as a candidate. It is not searchable until approved.
+            Stored as {result.document_type}, as a candidate. It is not searchable until approved.
           </p>
           <p className="document-upload__key">Document key: {result.document_key}</p>
           <ol className="document-upload__chunks">

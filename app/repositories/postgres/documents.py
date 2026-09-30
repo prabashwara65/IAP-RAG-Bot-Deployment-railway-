@@ -36,12 +36,18 @@ class PostgresDocumentRepository:
         self._session = session
 
     def create_document(
-        self, *, tenant_id: str, document_key: str, title: str
+        self,
+        *,
+        tenant_id: str,
+        document_key: str,
+        title: str,
+        document_type: str = "Other",
     ) -> DocumentRecord:
         model = DocumentModel(
             tenant_id=tenant_id,
             document_key=document_key,
             title=title,
+            document_type=document_type,
         )
         self._session.add(model)
         self._session.flush()

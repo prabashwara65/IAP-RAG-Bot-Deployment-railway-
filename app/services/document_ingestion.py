@@ -199,6 +199,7 @@ def persist_ingested_document(
     content: bytes,
     document: IngestedDocument,
     embedding_provider: EmbeddingProvider,
+    document_type: str = "Other",
 ) -> PersistedIngestedDocument:
     """Store extracted chunks and vectors as a non-searchable candidate version."""
     document_key = f"UPLOAD-{uuid4().hex.upper()}"
@@ -206,6 +207,7 @@ def persist_ingested_document(
         tenant_id=tenant_id,
         document_key=document_key,
         title=PurePath(document.filename).name[:300] or "Uploaded document",
+        document_type=document_type,
     )
     session.add(document_model)
     session.flush()

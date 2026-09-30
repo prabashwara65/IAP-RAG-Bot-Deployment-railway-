@@ -112,6 +112,9 @@ def ask_hr_question(
             embedding_provider=embedding_provider,
             llm_provider=llm_provider,
             repository=repository,
+            document_type=(
+                payload.document_type.value if payload.document_type is not None else None
+            ),
         )
     except HRRetrievalError as error:
         if error.code in _REQUEST_RETRIEVAL_CODES:

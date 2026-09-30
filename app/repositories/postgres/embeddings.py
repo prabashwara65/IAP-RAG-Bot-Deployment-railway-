@@ -70,6 +70,7 @@ class PostgresEmbeddingRepository:
         top_k: int,
         model_name: str,
         model_version: str,
+        document_type: str | None = None,
     ) -> tuple[SemanticSearchRecord, ...]:
         """Rank chunks by pgvector cosine distance inside PostgreSQL.
 
@@ -131,6 +132,8 @@ class PostgresEmbeddingRepository:
             )
             .limit(top_k)
         )
+        if document_type is not None:
+            statement = statement.where(DocumentModel.document_type == document_type)
 
         return tuple(
             SemanticSearchRecord(

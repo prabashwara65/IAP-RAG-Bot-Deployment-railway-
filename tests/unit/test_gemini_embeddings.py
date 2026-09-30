@@ -425,6 +425,7 @@ def test_the_provider_drives_the_existing_hr_retrieval_service() -> None:
         top_k=3,
         model_name="gemini",
         model_version=MODEL,
+        document_type=None,
     )
     assert [result.chunk_id for result in results] == [record.chunk_id]
 

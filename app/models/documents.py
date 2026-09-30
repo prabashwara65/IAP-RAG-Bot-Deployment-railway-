@@ -30,12 +30,14 @@ class DocumentModel(Base):
     __tablename__ = "documents"
     __table_args__ = (
         UniqueConstraint("tenant_id", "document_key", name="uq_documents_tenant_key"),
+        Index("ix_documents_tenant_document_type", "tenant_id", "document_type"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     tenant_id: Mapped[str] = mapped_column(String(120), nullable=False)
     document_key: Mapped[str] = mapped_column(String(160), nullable=False)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
+    document_type: Mapped[str] = mapped_column(String(80), default="Other", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

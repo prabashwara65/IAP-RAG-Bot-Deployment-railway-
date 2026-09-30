@@ -264,6 +264,7 @@ def answer_hr_question(
     repository: EmbeddingRepository,
     top_k: int = DEFAULT_TOP_K,
     max_context_chars: int = DEFAULT_MAX_CONTEXT_CHARS,
+    document_type: str | None = None,
 ) -> HRGroundedAnswer:
     """Answer one HR question strictly from retrieved, approved HR chunks.
 
@@ -288,6 +289,7 @@ def answer_hr_question(
         provider=embedding_provider,
         repository=repository,
         top_k=top_k,
+        document_type=document_type,
     )
     if not results:
         return _insufficient_answer()

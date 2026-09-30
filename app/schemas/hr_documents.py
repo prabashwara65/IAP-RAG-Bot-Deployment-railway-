@@ -30,6 +30,14 @@ class DocumentType(StrEnum):
     TECHNICAL_GUIDELINE = "Technical Guideline"
     CONTACT_DIRECTORY = "Contact Directory"
     PROJECT_PROPOSAL = "Project Proposal"
+    PROPOSAL = "Proposal"
+    CV = "CV"
+    RESUME = "Resume"
+    REPORT = "Report"
+    MEETING_NOTES = "Meeting Notes"
+    REQUIREMENTS = "Requirements"
+    CONTRACT = "Contract"
+    INVOICE = "Invoice"
     OTHER = "Other"
 
 

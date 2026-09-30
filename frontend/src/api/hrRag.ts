@@ -7,6 +7,7 @@
  */
 
 import {  apiBaseUrl,jsonHeaders } from "./http";
+import type { DocumentType } from "./documents";
 
 const ASK_PATH = "/api/v1/hr/ask";
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -28,6 +29,7 @@ export interface HrCitation {
 export interface HrAskRequest {
   question: string;
   tenant_id: string;
+  document_type?: DocumentType | null;
 }
 
 export interface HrAskResponse {

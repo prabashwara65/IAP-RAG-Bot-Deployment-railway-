@@ -36,7 +36,11 @@ def test_repository_create_read_and_candidate_isolation(
             tenant_id="tenant-test",
             document_key="DOC-001",
             title="Foundation test document",
+            document_type="CV",
         )
+        stored_document = session.get(DocumentModel, document.id)
+        assert stored_document is not None
+        assert stored_document.document_type == "CV"
         candidate = repository.create_candidate_version(
             document_id=document.id,
             version_label="1.0",

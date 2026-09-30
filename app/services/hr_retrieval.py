@@ -124,6 +124,7 @@ def retrieve_hr_chunks(
     provider: EmbeddingProvider,
     repository: EmbeddingRepository,
     top_k: int = DEFAULT_TOP_K,
+    document_type: str | None = None,
 ) -> tuple[HRSemanticRetrievalResult, ...]:
     """Return the closest active HR chunks for one tenant, closest first.
 
@@ -148,5 +149,6 @@ def retrieve_hr_chunks(
         top_k=top_k,
         model_name=provider.model_name,
         model_version=provider.model_version,
+        document_type=document_type,
     )
     return tuple(_to_result(record) for record in records)

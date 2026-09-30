@@ -37,8 +37,14 @@ def _document(
     tenant_id: str,
     document_key: str,
     title: str = "Synthetic HR Document",
+    document_type: str = "Other",
 ) -> DocumentModel:
-    model = DocumentModel(tenant_id=tenant_id, document_key=document_key, title=title)
+    model = DocumentModel(
+        tenant_id=tenant_id,
+        document_key=document_key,
+        title=title,
+        document_type=document_type,
+    )
     session.add(model)
     session.flush()
     return model
@@ -252,6 +258,7 @@ def _search(
     *,
     tenant_id: str = TENANT_ALPHA,
     top_k: int = 10,
+    document_type: str | None = None,
 ) -> tuple[SemanticSearchRecord, ...]:
     return PostgresEmbeddingRepository(session).search_similar_chunks(
         tenant_id=tenant_id,
@@ -259,7 +266,31 @@ def _search(
         top_k=top_k,
         model_name=MODEL_NAME,
         model_version=MODEL_VERSION,
+        document_type=document_type,
     )
+
+
+def test_search_can_filter_by_document_type(migrated_engine: Engine) -> None:
+    factory = create_session_factory(migrated_engine)
+    with session_scope(factory) as session:
+        cv_chunk, _ = _searchable_chunk(
+            session,
+            tenant_id=TENANT_ALPHA,
+            document_key="DOC-ALPHA-CV",
+            status=DocumentVersionStatus.ACTIVE,
+            values=QUERY_VECTOR,
+            title="Applicant CV",
+        )
+        version = session.get(DocumentVersionModel, cv_chunk.document_version_id)
+        assert version is not None
+        document = session.get(DocumentModel, version.document_id)
+        assert document is not None
+        document.document_type = "CV"
+        session.flush()
+
+        records = _search(session, document_type="CV")
+
+        assert [record.chunk_id for record in records] == [cv_chunk.id]
 
 
 def test_nearest_chunks_are_returned_first_with_cosine_distances(
