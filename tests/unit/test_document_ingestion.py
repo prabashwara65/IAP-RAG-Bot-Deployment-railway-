@@ -3,6 +3,7 @@
 from hashlib import sha256
 from io import BytesIO
 
+import fitz
 import pytest
 from docx import Document
 
@@ -45,6 +46,19 @@ def test_docx_text_is_extracted() -> None:
 
     assert result.extracted_text == "DOCX content"
     assert result.chunks[0].content_text == "DOCX content"
+
+
+def test_pdf_text_keeps_words_together() -> None:
+    pdf_document = fitz.open()
+    page = pdf_document.new_page()
+    page.insert_text((72, 72), "Yenuli Tharandi")
+    content = pdf_document.tobytes()
+    pdf_document.close()
+
+    result = ingest_document("resume.pdf", content)
+
+    assert result.extracted_text == "Yenuli Tharandi"
+    assert "Y E N U L I" not in result.extracted_text
 
 
 def test_chunk_hash_is_sha256_of_content() -> None:

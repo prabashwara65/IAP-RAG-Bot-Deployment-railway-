@@ -86,14 +86,19 @@ def _extract_text(filename: str, content: bytes) -> str:
             return content.decode("utf-8-sig").strip()
         if extension == ".pdf":
             try:
-                from pypdf import PdfReader
+                import fitz
             except ModuleNotFoundError as error:
                 raise DocumentIngestionError(
                     DocumentIngestionErrorCode.PARSER_UNAVAILABLE,
-                    "PDF reading is unavailable until the document parser dependencies are installed.",
+                    "PDF reading is unavailable until PyMuPDF is installed.",
                 ) from error
-            reader = PdfReader(io.BytesIO(content))
-            return "\n\n".join((page.extract_text() or "").strip() for page in reader.pages).strip()
+            pdf_document = None
+            try:
+                pdf_document = fitz.open(stream=content, filetype="pdf")
+                return "\n".join(page.get_text() for page in pdf_document).strip()
+            finally:
+                if pdf_document is not None:
+                    pdf_document.close()
 
         try:
             from docx import Document
