@@ -259,6 +259,24 @@ class AuthService:
             password_hash=hashed,
         )
 
+    def change_password(
+        self, user: UserAccount, *, current_password: str, new_password: str,
+    ) -> None:
+        """Change only the signed-in user's password after verifying the old one."""
+        stored = self._repository.get_password_hash_by_email(user.email)
+        if stored is None or not verify_password(current_password, stored):
+            raise AuthError(
+                AuthErrorCode.INVALID_CREDENTIALS,
+                "Your current password is not correct.",
+            )
+        _validate_password(new_password, require_strong=True)
+        if verify_password(new_password, stored):
+            raise AuthError(
+                AuthErrorCode.INVALID_PASSWORD,
+                "Choose a new password different from your current password.",
+            )
+        self._repository.update_password(user.id, hash_password(new_password))
+
     def verify_otp(self, *, email: str, code: str) -> IssuedSession:
         normalized_email = _validate_email(email)
         challenge = self._repository.latest_open_otp(normalized_email)

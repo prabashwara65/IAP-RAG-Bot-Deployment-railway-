@@ -14,17 +14,17 @@ interface ErrorNoticeProps {
  */
 const FAILURE_MESSAGES: Record<HrAskFailureKind, string> = {
   network:
-    "The HR assistant could not be reached. Check that the OIAP backend is running, then try again.",
+    "The Office assistant could not be reached. Check that the OIAP backend is running, then try again.",
   invalid_request:
     "That question could not be submitted. Try rephrasing it, or shorten it if it is very long.",
   rate_limited:
     "Rate limit reached — maximum 5 questions per minute. Please wait and try again shortly.",
   unavailable:
-    "The HR assistant is temporarily unavailable. Please try again in a few minutes.",
+    "The Office assistant is temporarily unavailable. Please try again in a few minutes.",
   unauthenticated:
     "Your session has ended. Sign in again to keep asking questions.",
   upstream:
-    "The HR assistant could not produce a grounded answer this time. Please try again.",
+    "The Office assistant could not produce a grounded answer this time. Please try again.",
   unexpected: "Something went wrong while answering. Please try again.",
 };
 

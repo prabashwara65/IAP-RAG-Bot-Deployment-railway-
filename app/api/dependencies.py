@@ -26,7 +26,7 @@ from app.providers.gemini_llm import GeminiLLMError, gemini_llm_provider_from_se
 from app.providers.llm import LLMProvider
 from app.repositories.embeddings import EmbeddingRepository
 from app.repositories.postgres.embeddings import PostgresEmbeddingRepository
-from app.repositories.postgres.users import PostgresUserAccountRepository
+from app.repositories.sqlalchemy_users import SQLAlchemyUserAccountRepository
 from app.repositories.users import UserAccountRepository
 from app.services.auth import AuthError, AuthService
 
@@ -60,7 +60,7 @@ def get_account_repository(
     session: Annotated[Session, Depends(get_session)],
 ) -> UserAccountRepository:
     """Bind the account repository to this request's session."""
-    return PostgresUserAccountRepository(session)
+    return SQLAlchemyUserAccountRepository(session)
 
 
 def get_auth_service(

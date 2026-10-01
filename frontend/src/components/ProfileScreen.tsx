@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   AUTH_FAILURE_MESSAGES,
@@ -11,6 +11,8 @@ import type { Profile, ThemePreference } from "../api/auth";
 import { AvatarMark } from "./AvatarMark";
 import { ThemeToggle } from "./ThemeToggle";
 import { TwoFactorSettings } from "./TwoFactorSettings";
+import { PasswordChangeForm } from "./PasswordChangeForm";
+import { ROLE_LABELS } from "../api/adminUsers";
 
 interface ProfileScreenProps {
   user: Profile;
@@ -33,6 +35,8 @@ export function ProfileScreen({
   const [notice, setNotice] = useState<string | null>(null);
   const [photoChanged, setPhotoChanged] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { titleRef.current?.focus(); }, []);
 
   const hasUnsavedName = displayName.trim() !== user.display_name;
 
@@ -128,33 +132,28 @@ export function ProfileScreen({
   }
 
   return (
-    <section className="glass profile-panel">
-      <button
-        className="profile-panel__close"
-        type="button"
-        onClick={onClose}
-        aria-label="Close profile"
-        title="Close"
-      >
-        ×
-      </button>
-
-      <h2 className="profile-panel__title">
-        Your profile
-      </h2>
-
-      <p className="page__subtitle">
-        Manage how you appear in the assistant, including your photo and theme.
-      </p>
-
-      <div className="profile-hero">
+    <main className="profile-page" aria-labelledby="profile-page-title">
+      <header className="profile-page__header">
+        <button className="profile-page__back" type="button" onClick={onClose}>
+          <span aria-hidden="true">←</span> Back to Assistant
+        </button>
+        <h1 id="profile-page-title" className="profile-page__title" ref={titleRef} tabIndex={-1}>My Profile</h1>
+        <p className="page__subtitle">Manage your personal details, appearance, and account security.</p>
+      </header>
+      <div className="profile-page__layout">
+      <aside className="glass profile-page__summary" aria-label="Account summary">
         <AvatarMark
           imageUrl={avatarUrl}
           name={user.display_name}
           size="lg"
         />
 
-        <div className="stack">
+        <div className="profile-page__identity">
+          <h2>{user.display_name}</h2>
+          <p>{user.email}</p>
+          <span className={`role-badge role-badge--${user.role ?? "user"}`}>{ROLE_LABELS[user.role ?? "user"]}</span>
+        </div>
+        <div className="stack profile-page__photo-actions">
           <input
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
@@ -189,12 +188,15 @@ export function ProfileScreen({
             </button>
           ) : null}
         </div>
-      </div>
+      </aside>
 
+      <div className="stack profile-page__forms">
       <form
-        className="stack"
+        className="glass stack profile-page__settings"
         onSubmit={save}
+        aria-labelledby="profile-settings-title"
       >
+        <h2 id="profile-settings-title">Account settings</h2>
         <label className="field">
           <span className="field__label">
             Display name
@@ -270,6 +272,9 @@ export function ProfileScreen({
           </button>
         ) : null}
       </form>
-    </section>
+      <PasswordChangeForm />
+      </div>
+      </div>
+    </main>
   );
 }

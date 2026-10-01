@@ -1,6 +1,8 @@
 import { apiBaseUrl, authHeaders, jsonHeaders } from "./http";
 import { setAccessToken } from "./session";
 
+export type UserRole = "user" | "admin" | "hr" | "employee" | "student";
+
 export type ThemePreference = "light" | "dark" | "system";
 export type TwoFactorMethod = "none" | "email_otp" | "totp";
 
@@ -11,6 +13,7 @@ export interface Profile {
   theme: ThemePreference;
   has_avatar: boolean;
   two_factor_method: TwoFactorMethod;
+  role?: UserRole;
 }
 
 export interface TotpSetup {
@@ -137,12 +140,14 @@ function authError(response: Response, payload: unknown): AuthApiError {
   );
 }
 
-function isProfile(value: unknown): value is Profile {
+export function isProfile(value: unknown): value is Profile {
   if (typeof value !== "object" || value === null) {
     return false;
   }
   const candidate = value as Partial<Profile>;
   return (
+    (candidate.role === undefined ||
+      ["user", "admin", "hr", "employee", "student"].includes(candidate.role)) &&
     typeof candidate.id === "string" &&
     typeof candidate.email === "string" &&
     typeof candidate.display_name === "string" &&
@@ -485,3 +490,19 @@ export const AUTH_FAILURE_MESSAGES: Record<AuthFailureKind, string> = {
   rate_limited: "Too many attempts. Wait a minute and try again.",
   unexpected: "Something went wrong. Please try again.",
 };
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl()}/api/v1/me/password`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+  } catch {
+    throw new AuthApiError("network");
+  }
+  if (!response.ok) {
+    throw authError(response, await readJson(response));
+  }
+}

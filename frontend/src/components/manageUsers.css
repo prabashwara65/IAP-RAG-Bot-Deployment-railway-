@@ -1,0 +1,69 @@
+.success-modal__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+  border-radius: 50%;
+  background: var(--ok-surface);
+  color: var(--text);
+  font-size: 1.5rem;
+}
+
+.success-modal__actions { grid-template-columns: 1fr; }
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.18rem 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.role-badge--admin { background: var(--caution-surface); color: var(--text); }
+.role-badge--hr { background: var(--ok-surface); color: var(--text); }
+.role-badge--employee, .role-badge--student { color: var(--text); }
+
+.users-panel { padding: 1.5rem; border-radius: var(--radius); margin-top: 1rem; }
+.users-panel__heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+.users-panel__heading h2 { margin: 0; font-size: 1.65rem; }
+.users-panel__heading p:not(.eyebrow) { margin: 0.4rem 0 0; color: var(--text-muted); }
+.users-panel__count { flex-shrink: 0; padding: 0.4rem 0.75rem; border-radius: 999px; background: var(--surface-strong); color: var(--text-muted); font-size: 0.85rem; }
+.users-search { display: grid; gap: 0.45rem; max-width: 28rem; margin: 1.5rem 0; }
+.users-search span, .user-row__assignment label { font-size: 0.82rem; font-weight: 700; color: var(--text-muted); }
+.users-search input, .user-row select { width: 100%; border: 1px solid var(--border-strong); border-radius: 0.8rem; background: var(--dialog-surface); color: var(--text); font: inherit; min-height: 2.8rem; padding: 0.6rem 0.8rem; }
+.users-search input:focus-visible, .user-row select:focus-visible, .users-save:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.users-list { display: grid; gap: 0.85rem; }
+.user-row { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; padding: 1.15rem; border: 1px solid var(--border-strong); border-radius: 1rem; background: var(--surface-strong); }
+.user-row__identity { display: flex; gap: 0.8rem; align-items: center; min-width: 0; }
+.user-row__identity > div { min-width: 0; }
+.user-row__avatar { display: inline-flex; align-items: center; justify-content: center; width: 2.8rem; height: 2.8rem; flex-shrink: 0; border-radius: 0.85rem; background: var(--surface-muted); border: 1px solid var(--border-strong); font-size: 1.15rem; font-weight: 700; }
+.user-row h3 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.user-row h3 small { color: var(--text-muted); font-weight: 400; }
+.user-row p { margin: 0.15rem 0 0.5rem; font-size: 0.85rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.user-row__assignment { display: grid; gap: 0.4rem; min-width: 20rem; }
+.user-row__controls { display: grid; grid-template-columns: minmax(8rem, 1fr) auto; gap: 0.6rem; }
+.user-row__assignment > small { color: var(--text-muted); font-size: 0.75rem; }
+.users-save { border: 1px solid var(--accent); border-radius: 0.8rem; background: var(--accent); color: var(--accent-contrast); padding: 0.6rem 1rem; font: inherit; font-weight: 700; cursor: pointer; }
+.users-save:disabled, .user-row select:disabled { opacity: 0.5; cursor: not-allowed; }
+.users-pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; }
+.users-pagination span { color: var(--text-muted); font-size: 0.85rem; }
+.users-panel__error { padding: 0.8rem 1rem; border: 1px solid var(--error-border); background: var(--error-surface); border-radius: 0.8rem; margin-bottom: 1rem; }
+.users-panel__error p { margin: 0; }
+.topbar__nav .text-btn[aria-current="page"] { background: var(--surface-strong); color: var(--accent-strong); border-radius: 0.6rem; }
+
+@media (max-width: 720px) {
+  .users-panel { padding: 1rem; }
+  .users-panel__heading { flex-direction: column; }
+  .user-row { align-items: stretch; flex-direction: column; gap: 1rem; }
+  .user-row__assignment { min-width: 0; }
+  .user-row__controls { grid-template-columns: 1fr; }
+  .users-pagination { gap: 0.5rem; }
+  .profile-hit .role-badge { display: none; }
+}

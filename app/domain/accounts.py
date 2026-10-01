@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from app.domain.roles import Role
+
 ThemePreference = Literal["light", "dark", "system"]
 OtpPurpose = Literal["signup", "login", "totp_login"]
 TwoFactorMethod = Literal["none", "email_otp", "totp"]
@@ -26,6 +28,7 @@ class UserAccount:
     avatar_path: str | None
     created_at: datetime
     two_factor_method: TwoFactorMethod = "email_otp"
+    role: Role = Role.USER
 
 
 @dataclass(frozen=True)
