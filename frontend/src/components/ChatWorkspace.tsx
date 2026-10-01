@@ -83,7 +83,7 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
         {turns.length === 0 ? (
           <section className="chat-welcome" aria-label="Get started">
             <h2 className="chat-welcome__title">
-              Welcome to the HR assistant
+              Welcome to the Office assistant
             </h2>
             <p className="chat-welcome__description">
               Ask a question about your workplace policies using the box below.

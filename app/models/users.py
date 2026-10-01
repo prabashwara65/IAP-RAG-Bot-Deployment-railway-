@@ -1,4 +1,4 @@
-"""PostgreSQL mappings for accounts, OTP challenges, and sessions."""
+"""SQLAlchemy mappings for accounts, OTP challenges, and sessions."""
 
 from __future__ import annotations
 
@@ -18,12 +18,17 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
+from app.domain.roles import Role
 
 
 class UserModel(Base):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email"),
+        CheckConstraint(
+            "role IN ('user', 'admin', 'hr', 'employee', 'student')",
+            name="ck_users_role",
+        ),
         CheckConstraint("theme IN ('light', 'dark', 'system')", name="ck_users_theme"),
         CheckConstraint(
             "two_factor_method IN ('none', 'email_otp', 'totp')",
@@ -35,6 +40,9 @@ class UserModel(Base):
     email: Mapped[str] = mapped_column(String(254), nullable=False)
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
     theme: Mapped[str] = mapped_column(String(20), nullable=False, server_default="system")
+    role: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=Role.USER.value, server_default="user", index=True
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     two_factor_method: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default="email_otp"
