@@ -5,12 +5,15 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.accounts import ThemePreference, TwoFactorMethod, UserAccount
+from app.domain.roles import Role
 
 
 class SignupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email: str = Field(min_length=3, max_length=254)
     display_name: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=8, max_length=128)
@@ -46,11 +49,13 @@ class ProfileResponse(BaseModel):
     theme: ThemePreference
     has_avatar: bool
     two_factor_method: TwoFactorMethod = "email_otp"
+    role: Role = Role.USER
 
     @classmethod
     def from_account(cls, account: UserAccount) -> ProfileResponse:
         return cls(
             id=account.id,
+            role=account.role,
             email=account.email,
             display_name=account.display_name,
             theme=account.theme,
@@ -78,6 +83,8 @@ class LoginResponse(BaseModel):
 
 
 class ProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
     theme: ThemePreference | None = None
 
@@ -94,3 +101,9 @@ class TotpSetupResponse(BaseModel):
 
 class TotpConfirmRequest(BaseModel):
     code: str = Field(min_length=6, max_length=8)
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)

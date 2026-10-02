@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from typing import Annotated, NoReturn
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from app.core.rate_limit import enforce_rate_limit
 
-from app.api.dependencies import get_auth_service, get_current_user
+from app.api.dependencies import get_auth_service, get_current_user, get_session
 from app.domain.accounts import UserAccount
 from app.schemas.auth import (
+    ChangePasswordRequest,
     ProfileResponse,
     ProfileUpdateRequest,
     TotpConfirmRequest,
@@ -147,3 +150,28 @@ def delete_avatar(
     except AuthError as error:
         _fail(error)
     return ProfileResponse.from_account(updated)
+
+
+@router.post(
+    "/password", status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(enforce_rate_limit)],
+)
+def change_password(
+    payload: ChangePasswordRequest,
+    user: Annotated[UserAccount, Depends(get_current_user)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    session: Annotated[Session, Depends(get_session)],
+    background_tasks: BackgroundTasks,
+) -> None:
+    try:
+        auth.change_password(
+            user, current_password=payload.current_password,
+            new_password=payload.new_password,
+        )
+    except AuthError as error:
+        if error.code in {AuthErrorCode.INVALID_CREDENTIALS, AuthErrorCode.INVALID_PASSWORD}:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+        _fail(error)
+    # Commit before confirming success or sending the existing security notice.
+    session.commit()
+    background_tasks.add_task(auth.send_password_changed_notice, user.email)

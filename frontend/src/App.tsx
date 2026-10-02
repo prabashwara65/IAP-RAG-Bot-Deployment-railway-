@@ -1,3 +1,4 @@
+import "./components/manageUsers.css";
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchAvatarBlob,
@@ -12,9 +13,11 @@ import { AuthScreen } from "./components/AuthScreen";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { OtpScreen } from "./components/OtpScreen";
 import { LogoutConfirmModal } from "./components/LogoutConfirmModal";
+import { ManageUsersScreen } from "./components/ManageUsersScreen";
+import { SuccessModal } from "./components/SuccessModal";
 import { ProfileScreen } from "./components/ProfileScreen";
 
-type Screen = "auth" | "otp" | "chat" | "profile";
+type Screen = "auth" | "otp" | "chat" | "profile" | "users" | "sign-in-success";
 
 function applyTheme(theme: ThemePreference) {
   const root = document.documentElement;
@@ -48,6 +51,10 @@ export function App() {
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [successDialog, setSuccessDialog] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
 
   const loadAvatar = useCallback(async (profile: Profile) => {
     if (!profile.has_avatar) {
@@ -144,6 +151,7 @@ export function App() {
 
     setUser(null);
     setOtp(null);
+    setSuccessDialog(null);
     setScreen("auth");
 
     setAvatarUrl((previous) => {
@@ -165,6 +173,10 @@ export function App() {
     try {
       await handleLogout();
       setLogoutOpen(false);
+      setSuccessDialog({
+        title: "Signed out",
+        message: "Thank you for using OIAP Office Assistant. You have successfully signed out.",
+      });
     } finally {
       setIsLoggingOut(false);
     }
@@ -188,6 +200,48 @@ export function App() {
     }
   }
 
+  useEffect(() => {
+    if (screen !== "sign-in-success") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setScreen("chat");
+    }, 3_000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [screen]);
+
+  function acceptSignIn(profile: Profile) {
+    setUser(profile);
+    setOtp(null);
+    applyTheme(profile.theme);
+    setSuccessDialog(null);
+    setScreen("sign-in-success");
+    void loadAvatar(profile);
+  }
+
+  async function handleAccessDenied() {
+    setScreen("chat");
+    try {
+      const profile = await fetchProfile();
+      setUser(profile);
+    } catch {
+      await handleLogout();
+    }
+  }
+
+  const successModal = (
+    <SuccessModal
+      isOpen={successDialog !== null}
+      title={successDialog?.title ?? ""}
+      message={successDialog?.message ?? ""}
+      onClose={() => setSuccessDialog(null)}
+    />
+  );
+
   if (booting) {
     return (
       <div className="auth-layout">
@@ -201,6 +255,21 @@ export function App() {
     );
   }
 
+  if (screen === "sign-in-success" && user !== null) {
+    return (
+      <div className="auth-layout">
+        <SuccessModal
+          isOpen
+          title="Signed in successfully"
+          message="Welcome to OIAP HR Assistant. You have successfully signed in."
+          note="Opening the RAG bot in 3 seconds…"
+          showButton={false}
+          onClose={() => {}}
+        />
+      </div>
+    );
+  }
+
   if (screen === "auth" || user === null) {
     if (screen === "otp" && otp !== null) {
       return (
@@ -209,19 +278,14 @@ export function App() {
           issued={otp.issued}
           mode={otp.mode}
           onBack={() => setScreen("auth")}
-          onVerified={(profile) => {
-            setUser(profile);
-            applyTheme(profile.theme);
-            setScreen("chat");
-
-            void loadAvatar(profile);
-          }}
+          onVerified={acceptSignIn}
           password={otp.password}
         />
       );
     }
 
     return (
+      <>
       <AuthScreen
         initialEmail={otp?.email ?? ""}
         initialMode={otp?.mode === "reset" ? "forgot" : otp?.mode === "login" ? "login" : "signup"}
@@ -242,13 +306,10 @@ export function App() {
 
           setScreen("otp");
         }}
-        onSignedIn={(profile) => {
-          setUser(profile);
-          applyTheme(profile.theme);
-          setScreen("chat");
-          void loadAvatar(profile);
-        }}
+        onSignedIn={acceptSignIn}
       />
+      {successModal}
+      </>
     );
   }
 
@@ -259,30 +320,21 @@ export function App() {
         issued={otp.issued}
         mode={otp.mode}
         onBack={() => setScreen("auth")}
-        onVerified={(profile) => {
-          setUser(profile);
-          applyTheme(profile.theme);
-          setScreen("chat");
-
-          void loadAvatar(profile);
-        }}
+        onVerified={acceptSignIn}
         password={otp.password}
       />
     );
   }
 
   return (
-    <div className="page">
+    <div className={screen === "profile" ? "page page--profile" : "page"}>
       <AppHeader
-        active={
-          screen === "profile"
-            ? "profile"
-            : "chat"
-        }
+        active={screen === "profile" ? "profile" : screen === "users" ? "users" : "chat"}
         avatarUrl={avatarUrl}
         onLogout={() => setLogoutOpen(true)}
         onOpenChat={() => setScreen("chat")}
         onOpenProfile={() => setScreen("profile")}
+        onOpenUsers={() => { if (user.role === "admin") setScreen("users"); }}
         onThemeChange={(theme) => {
           void handleTheme(theme);
         }}
@@ -290,7 +342,13 @@ export function App() {
         user={user}
       />
 
-      {screen === "profile" ? (
+      {screen === "users" && user.role === "admin" ? (
+        <ManageUsersScreen
+          currentUser={user}
+          onUnauthenticated={() => { void handleLogout(); }}
+          onAccessDenied={() => { void handleAccessDenied(); }}
+        />
+      ) : screen === "profile" ? (
         <ProfileScreen
           avatarUrl={avatarUrl}
           onAvatarChanged={() => {
@@ -321,6 +379,8 @@ export function App() {
           void confirmLogout();
         }}
       />
+
+      {successModal}
 
       <footer className="page__footer">
         <p>

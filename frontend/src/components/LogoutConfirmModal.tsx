@@ -70,14 +70,14 @@ export function LogoutConfirmModal({
           className="logout-modal__title"
           id="logout-modal-title"
         >
-          Logout ?
+          Sign Out?
         </h2>
 
         <p
           className="logout-modal__description"
           id="logout-modal-description"
         >
-          Are you sure you want to log out of your account?
+          Are you sure you want to sign out from your account?
         </p>
 
         <div className="logout-modal__actions">
@@ -96,7 +96,7 @@ export function LogoutConfirmModal({
             onClick={onConfirm}
             disabled={isLoggingOut}
           >
-            {isLoggingOut ? "Logging out…" : "Log out"}
+            {isLoggingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>
       </section>

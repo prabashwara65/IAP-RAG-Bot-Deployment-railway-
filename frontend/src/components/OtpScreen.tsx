@@ -335,7 +335,7 @@ export function OtpScreen({
             <aside className="otp-inbox" aria-live="polite">
               <p className="otp-inbox__label">Two-factor email</p>
               <p className="otp-inbox__hint">
-                Open the message from OIAP HR Assistant and enter the code
+                Open the message from OIAP Office Assistant and enter the code
                 below. The code is not shown in this app when Gmail SMTP is
                 configured.
               </p>
