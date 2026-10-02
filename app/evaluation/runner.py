@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from app.core.config import get_settings
 from app.evaluation.hr_cases import HR_EVALUATION_CASES, HREvaluationCase
 from app.evaluation.metrics import (
     RETRIEVAL_CUTOFFS,
@@ -74,6 +75,9 @@ def evaluate_hr_rag(
                 provider=embedding_provider,
                 repository=repository,
                 top_k=top_k,
+                search_mode=(
+                    "hybrid" if get_settings().use_hybrid_search else "vector"
+                ),
             )
             retrieval_outcomes.append(score_retrieval(case, results))
 

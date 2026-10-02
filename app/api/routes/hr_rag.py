@@ -18,6 +18,8 @@ from app.api.dependencies import (
     get_embedding_repository,
     get_llm_provider,
 )
+from app.domain.accounts import UserAccount
+from app.domain.roles import Role
 from app.core.logging import get_logger
 from app.core.rate_limit import enforce_rate_limit
 from app.providers.embeddings import EmbeddingProvider
@@ -92,6 +94,7 @@ def _fail(
 )
 def ask_hr_question(
     payload: HRAskRequest,
+    user: Annotated[UserAccount, Depends(get_current_user)],
     embedding_provider: Annotated[EmbeddingProvider, Depends(get_embedding_provider)],
     llm_provider: Annotated[LLMProvider, Depends(get_llm_provider)],
     repository: Annotated[EmbeddingRepository, Depends(get_embedding_repository)],
@@ -105,6 +108,11 @@ def ask_hr_question(
     An answer with no supporting evidence is a normal 200 response carrying
     ``insufficient_evidence``; it is not an error.
     """
+    if payload.document_type is not None and user.role != Role.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can filter searches by document type.",
+        )
     try:
         answer = answer_hr_question(
             question=payload.question,

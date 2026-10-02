@@ -17,7 +17,7 @@ import {
   saveActiveChat,
 } from "../services/activeChatStorage";
 
-const TENANT_ID = "real";
+const TENANT_ID = "tenant-real";
 
 interface Failure {
   kind: HrAskFailureKind;
@@ -25,12 +25,16 @@ interface Failure {
 }
 
 interface ChatWorkspaceProps {
+  userRole: UserRole | undefined;
   onUnauthenticated: () => void;
   userId?: string | undefined;
-  userRole?: UserRole | undefined;
 }
 
-export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole }: ChatWorkspaceProps) {
+export function ChatWorkspace({
+  onUnauthenticated,
+  userId = "default",
+  userRole,
+}: ChatWorkspaceProps) {
   const [turns, setTurns] = useState<ChatTurn[]>(() => loadActiveChat(userId));
   const [isLoading, setIsLoading] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -65,8 +69,10 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
 
   async function handleSaveChat() {
     if (turns.length === 0 || isSaving) return;
+
     setIsSaving(true);
     setSaveToast(null);
+
     try {
       await saveChatSession(turns);
       setSaveToast("Chat saved to account!");
@@ -83,15 +89,23 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
     try {
       setIsLoading(true);
       setFailure(null);
+
       const detail = await getSavedChat(chatId);
+
       setTurns(detail.messages);
       saveActiveChat(userId, detail.messages);
     } catch (error) {
-      const kind = error instanceof HrAskError ? error.kind : "unexpected";
+      const kind =
+        error instanceof HrAskError ? error.kind : "unexpected";
+
       if (kind === "unauthenticated") {
         onUnauthenticated();
       }
-      setFailure({ kind: "unexpected", correlationId: null });
+
+      setFailure({
+        kind: "unexpected",
+        correlationId: null,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -103,21 +117,34 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
     }
 
     setFailure(null);
+
     setTurns((previous) => [
       ...previous,
-      { id: createTurnId(), role: "user", question },
+      {
+        id: createTurnId(),
+        role: "user",
+        question,
+      },
     ]);
+
     setIsLoading(true);
 
     try {
       const response = await askHrQuestion({
         question,
         tenant_id: TENANT_ID,
-        ...(documentType === "" ? {} : { document_type: documentType }),
+        ...(userRole === "admin" && documentType !== ""
+          ? { document_type: documentType }
+          : {}),
       });
+
       setTurns((previous) => [
         ...previous,
-        { id: createTurnId(), role: "assistant", response },
+        {
+          id: createTurnId(),
+          role: "assistant",
+          response,
+        },
       ]);
     } catch (error) {
       const kind =
@@ -129,8 +156,14 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
 
       setFailure(
         error instanceof HrAskError
-          ? { kind: error.kind, correlationId: error.correlationId }
-          : { kind: "unexpected", correlationId: null },
+          ? {
+              kind: error.kind,
+              correlationId: error.correlationId,
+            }
+          : {
+              kind: "unexpected",
+              correlationId: null,
+            },
       );
     } finally {
       setIsLoading(false);
@@ -147,7 +180,17 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
             onClick={handleNewChat}
             title="Clear active chat and start fresh"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -159,9 +202,23 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
             className="chat__toolbar-btn chat__toolbar-btn--save"
             onClick={() => void handleSaveChat()}
             disabled={turns.length === 0 || isSaving}
-            title={turns.length === 0 ? "Ask a question to save conversation" : "Save this chat to your account"}
+            title={
+              turns.length === 0
+                ? "Ask a question to save conversation"
+                : "Save this chat to your account"
+            }
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
               <polyline points="17 21 17 13 7 13 7 21" />
               <polyline points="7 3 7 8 15 8" />
@@ -175,7 +232,17 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
             onClick={() => setDrawerOpen(true)}
             title="Open recent saved chats"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
@@ -190,12 +257,17 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
         </div>
       </div>
 
-      <div className="chat__transcript" role="log" aria-label="Conversation">
+      <div
+        className="chat__transcript"
+        role="log"
+        aria-label="Conversation"
+      >
         {turns.length === 0 ? (
           <section className="chat-welcome" aria-label="Get started">
             <h2 className="chat-welcome__title">
               Welcome to the Office assistant
             </h2>
+
             <p className="chat-welcome__description">
               Ask a question about your workplace policies using the box below.
             </p>
@@ -222,21 +294,37 @@ export function ChatWorkspace({ onUnauthenticated, userId = "default", userRole 
         <div ref={endOfTranscript} />
       </div>
 
-      {userRole === "admin" ? <DocumentUploadPanel onUnauthenticated={onUnauthenticated} /> : null}
+      {userRole === "admin" ? (
+        <DocumentUploadPanel
+          onUnauthenticated={onUnauthenticated}
+        />
+      ) : null}
+
       {userRole === "admin" ? (
         <label className="chat__type-filter">
           Search document type
+
           <select
             aria-label="Search document type"
             disabled={isLoading}
-            onChange={(event) => setDocumentType(event.target.value as DocumentType | "")}
+            onChange={(event) =>
+              setDocumentType(
+                event.target.value as DocumentType | "",
+              )
+            }
             value={documentType}
           >
             <option value="">All types</option>
-            {DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+
+            {DOCUMENT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
           </select>
         </label>
       ) : null}
+
       <ChatComposer
         isLoading={isLoading}
         onAsk={(question) => {

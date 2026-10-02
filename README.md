@@ -509,6 +509,7 @@ fail with a clear error.
 | `DB_PASSWORD` | local placeholder | Database password; handled as a secret |
 | `DATABASE_POOL_SIZE` | `5` | Connection pool size, 1–50 |
 | `DATABASE_CONNECT_TIMEOUT_SECONDS` | `5` | Connection timeout in seconds, 1–60 |
+| `AUTO_ACTIVATE_UPLOADS` | `true` in development/test; `false` otherwise | Automatically approves and activates completed uploads; can be explicitly overridden |
 | `EMBEDDING_DIMENSION` | `768` | Embedding dimension enforced against each embedding set |
 | `RATE_LIMIT_REQUESTS` | `5` | Requests allowed per client per window on `/hr/ask`, 1–10000 |
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate-limit window length in seconds, 1–3600 |
@@ -587,6 +588,8 @@ an enterprise production system, and the list below is the honest reason why.
 - **LangGraph orchestration is not implemented.**
 - **MCP integration is not implemented.**
 - **Human-in-the-loop approval workflows are not implemented.**
+- **Demo-mode uploads are auto-activated.** This bypasses the human-approval
+  step; keep `AUTO_ACTIVATE_UPLOADS=false` when that behavior is not appropriate.
 - **Document ingestion from real PDFs is not implemented.** The corpus is
   authored synthetic content.
 

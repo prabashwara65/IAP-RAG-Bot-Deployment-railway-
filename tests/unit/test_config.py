@@ -17,6 +17,7 @@ from app.core.config import (
 SETTING_NAMES = (
     "APP_NAME",
     "APP_ENV",
+    "AUTO_ACTIVATE_UPLOADS",
     "APP_VERSION",
     "LOG_LEVEL",
     "API_PREFIX",
@@ -61,6 +62,7 @@ def test_settings_load_safe_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert settings.app_name == "office-intelligence-automation-platform-oiap"
     assert settings.app_env == "development"
+    assert settings.auto_activate_uploads is True
     assert settings.app_version == "0.1.0"
     assert settings.log_level == "INFO"
     assert settings.api_prefix == "/api/v1"
@@ -81,6 +83,7 @@ def test_environment_variables_override_defaults(
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("API_PREFIX", "/test/v1")
     monkeypatch.setenv("CORS_ORIGINS", '["https://example.com"]')
+    monkeypatch.setenv("AUTO_ACTIVATE_UPLOADS", "false")
 
     settings = get_settings()
 
@@ -88,6 +91,17 @@ def test_environment_variables_override_defaults(
     assert settings.log_level == "DEBUG"
     assert settings.api_prefix == "/test/v1"
     assert settings.cors_origins == ["https://example.com"]
+    assert settings.auto_activate_uploads is False
+
+
+@pytest.mark.parametrize(
+    ("app_env", "expected"),
+    [("development", True), ("test", True), ("staging", False), ("production", False)],
+)
+def test_auto_activation_defaults_by_environment(app_env: str, expected: bool) -> None:
+    settings = Settings(_env_file=None, app_env=app_env)  # type: ignore[call-arg]
+
+    assert settings.auto_activate_uploads is expected
 
 
 @pytest.mark.parametrize(

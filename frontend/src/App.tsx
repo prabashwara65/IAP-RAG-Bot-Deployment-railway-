@@ -18,7 +18,13 @@ import { SuccessModal } from "./components/SuccessModal";
 import { ProfileScreen } from "./components/ProfileScreen";
 import { clearActiveChat } from "./services/activeChatStorage";
 
-type Screen = "auth" | "otp" | "chat" | "profile" | "users" | "sign-in-success";
+type Screen =
+  | "auth"
+  | "otp"
+  | "chat"
+  | "profile"
+  | "users"
+  | "sign-in-success";
 
 function applyTheme(theme: ThemePreference) {
   const root = document.documentElement;
@@ -52,6 +58,7 @@ export function App() {
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const [successDialog, setSuccessDialog] = useState<{
     title: string;
     message: string;
@@ -151,6 +158,7 @@ export function App() {
     if (user !== null) {
       clearActiveChat(user.id);
     }
+
     await logoutRequest();
 
     setUser(null);
@@ -176,10 +184,13 @@ export function App() {
 
     try {
       await handleLogout();
+
       setLogoutOpen(false);
+
       setSuccessDialog({
         title: "Signed out",
-        message: "Thank you for using OIAP Office Assistant. You have successfully signed out.",
+        message:
+          "Thank you for using OIAP Office Assistant. You have successfully signed out.",
       });
     } finally {
       setIsLoggingOut(false);
@@ -230,6 +241,7 @@ export function App() {
 
   async function handleAccessDenied() {
     setScreen("chat");
+
     try {
       const profile = await fetchProfile();
       setUser(profile);
@@ -250,10 +262,7 @@ export function App() {
   if (booting) {
     return (
       <div className="auth-layout">
-        <p
-          className="chat__empty"
-          role="status"
-        >
+        <p className="chat__empty" role="status">
           Loading…
         </p>
       </div>
@@ -291,29 +300,36 @@ export function App() {
 
     return (
       <>
-      <AuthScreen
-        initialEmail={otp?.email ?? ""}
-        initialMode={otp?.mode === "reset" ? "forgot" : otp?.mode === "login" ? "login" : "signup"}
-        onOtpIssued={(
-          issued,
-          mode,
-          displayName,
-          password,
-          email,
-        ) => {
-          setOtp({
+        <AuthScreen
+          initialEmail={otp?.email ?? ""}
+          initialMode={
+            otp?.mode === "reset"
+              ? "forgot"
+              : otp?.mode === "login"
+                ? "login"
+                : "signup"
+          }
+          onOtpIssued={(
             issued,
             mode,
-            name: displayName,
+            displayName,
             password,
             email,
-          });
+          ) => {
+            setOtp({
+              issued,
+              mode,
+              name: displayName,
+              password,
+              email,
+            });
 
-          setScreen("otp");
-        }}
-        onSignedIn={acceptSignIn}
-      />
-      {successModal}
+            setScreen("otp");
+          }}
+          onSignedIn={acceptSignIn}
+        />
+
+        {successModal}
       </>
     );
   }
@@ -332,14 +348,30 @@ export function App() {
   }
 
   return (
-    <div className={screen === "profile" ? "page page--profile" : "page"}>
+    <div
+      className={
+        screen === "profile"
+          ? "page page--profile"
+          : "page"
+      }
+    >
       <AppHeader
-        active={screen === "profile" ? "profile" : screen === "users" ? "users" : "chat"}
+        active={
+          screen === "profile"
+            ? "profile"
+            : screen === "users"
+              ? "users"
+              : "chat"
+        }
         avatarUrl={avatarUrl}
         onLogout={() => setLogoutOpen(true)}
         onOpenChat={() => setScreen("chat")}
         onOpenProfile={() => setScreen("profile")}
-        onOpenUsers={() => { if (user.role === "admin") setScreen("users"); }}
+        onOpenUsers={() => {
+          if (user.role === "admin") {
+            setScreen("users");
+          }
+        }}
         onThemeChange={(theme) => {
           void handleTheme(theme);
         }}
@@ -350,8 +382,12 @@ export function App() {
       {screen === "users" && user.role === "admin" ? (
         <ManageUsersScreen
           currentUser={user}
-          onUnauthenticated={() => { void handleLogout(); }}
-          onAccessDenied={() => { void handleAccessDenied(); }}
+          onUnauthenticated={() => {
+            void handleLogout();
+          }}
+          onAccessDenied={() => {
+            void handleAccessDenied();
+          }}
         />
       ) : screen === "profile" ? (
         <ProfileScreen

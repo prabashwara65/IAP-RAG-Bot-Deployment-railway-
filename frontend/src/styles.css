@@ -888,32 +888,33 @@ html[data-theme="dark"] body {
   margin-bottom: 0.45rem;
 }
 .switch {
-  background: var(--border);
-  border: 0;
+  background: var(--surface-strong);
+  border: 2px solid var(--text-muted);
   border-radius: 999px;
   cursor: pointer;
   flex: 0 0 auto;
-  height: 1.7rem;
-  padding: 0.18rem;
-  width: 2.9rem;
+  height: 32px;
+  padding: 3px;
+  width: 56px;
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
-.switch:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-.switch.is-on {
-  background: var(--accent);
-}
+.switch:disabled { cursor: wait; opacity: 0.7; }
+.switch.is-on { background: var(--accent); border-color: var(--accent-strong); }
 .switch__thumb {
-  background: #fff;
+  background: var(--text-muted);
   border-radius: 50%;
   display: block;
-  height: 1.34rem;
-  transition: transform 0.15s ease;
-  width: 1.34rem;
+  height: 22px;
+  width: 22px;
+  transition: transform 150ms ease, background-color 150ms ease;
 }
-.switch.is-on .switch__thumb {
-  transform: translateX(1.2rem);
+.switch.is-on .switch__thumb { background: #fff; transform: translateX(24px); }
+.security-card .switch:focus-visible,
+.security-card .factor-option:focus-visible,
+.security-card .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.security-card .btn--ghost { border: 2px solid var(--text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .switch, .switch__thumb { transition: none; }
 }
 .factor-options {
   display: flex;
@@ -924,7 +925,7 @@ html[data-theme="dark"] body {
 .factor-option {
   align-items: flex-start;
   background: transparent;
-  border: 1px solid var(--border);
+  border: 2px solid var(--text-muted);
   border-radius: 12px;
   color: inherit;
   cursor: pointer;
@@ -940,7 +941,7 @@ html[data-theme="dark"] body {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .factor-option__mark {
-  border: 2px solid var(--border);
+  border: 2px solid var(--text-muted);
   border-radius: 50%;
   flex: 0 0 auto;
   height: 1rem;
@@ -1322,7 +1323,8 @@ html[data-theme="dark"] .oiap-nav__logout { color: #fda4af; }
 .profile-page__photo-actions { width: 100%; }
 .profile-page__settings { padding: clamp(1.25rem, 3vw, 2rem); border-radius: 20px; min-width: 0; gap: 1.25rem; }
 .profile-page__settings > h2 { margin: 0; font-size: 1.15rem; }
-.profile-page__settings .theme-toggle { width: min(100%, 320px); }
+.profile-page__settings .theme-toggle ,
+.oiap-nav__theme-panel .theme-toggle { width: min(100%, 320px); }
 .profile-page__settings .notice { margin: 0; }
 @media (max-width: 760px) {
   .page.page--profile { padding: 0.85rem 0.75rem 1rem; }
@@ -1336,7 +1338,6 @@ html[data-theme="dark"] .oiap-nav__logout { color: #fda4af; }
 .password-change__heading svg { color: var(--accent-strong); flex-shrink: 0; }
 .password-change__hint { color: var(--text-muted); font-size: 0.82rem; margin: 0; }
 .password-change__submit { justify-self: start; width: fit-content; border-radius: 999px; }
-
 /* button styles */
 .profile-page__settings .theme-toggle ,
 .oiap-nav__theme-panel .theme-toggle { border: 2px solid var(--text-muted); gap: 0.25rem; padding: 0.25rem; }
