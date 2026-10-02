@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     )
     app_env: AppEnvironment = "development"
     auto_activate_uploads: bool = True
+    use_hybrid_search: bool = True
     app_version: str = Field(default="0.1.0", pattern=r"^\d+\.\d+\.\d+$")
     log_level: LogLevel = "INFO"
     api_prefix: str = "/api/v1"

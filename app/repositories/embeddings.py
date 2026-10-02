@@ -37,3 +37,19 @@ class EmbeddingRepository(Protocol):
         documents. No database expression may cross this boundary.
         """
         ...
+
+    def search_similar_chunks_hybrid(
+        self,
+        *,
+        tenant_id: str,
+        query_vector: Sequence[float],
+        query_text: str,
+        top_k: int,
+        model_name: str,
+        model_version: str,
+        document_type: str | None = None,
+        rrf_k: int = 60,
+        candidate_pool: int = 50,
+    ) -> tuple[SemanticSearchRecord, ...]:
+        """Return active chunks ranked by vector and full-text RRF."""
+        ...

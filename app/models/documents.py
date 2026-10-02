@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -20,7 +21,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -104,6 +105,10 @@ class ChunkModel(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     heading_path: Mapped[str] = mapped_column(String(500), nullable=False)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    content_tsv: Mapped[str] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('english', content_text)", persisted=True),
+    )
     content_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

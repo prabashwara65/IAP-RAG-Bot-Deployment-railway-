@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.providers.embeddings import EmbeddingProvider
 from app.providers.llm import LLMProvider
@@ -44,8 +45,11 @@ GROUNDING_SYSTEM_PROMPT = (
     "4. Cite every factual claim with the source identifiers given to you, such "
     "as [S1] or [S2].\n"
     "5. Never cite a source identifier that was not supplied to you.\n"
-    "6. If the supplied sources do not answer the question, reply with exactly: "
-    f"{INSUFFICIENT_EVIDENCE_ANSWER}\n"
+    "6. If any supplied source contains information relevant to the question, "
+    "use it — even if the question is short, informal, or loosely worded. "
+    "Prefer a grounded answer over refusing. Only reply with exactly: "
+    f"{INSUFFICIENT_EVIDENCE_ANSWER}"
+    " when the supplied sources are entirely unrelated to the question.\n"
     "7. Keep the answer concise, factual, and free of speculation.\n"
     "\n"
     "Source trust rules:\n"
@@ -117,6 +121,40 @@ class HRGroundedAnswer:
     answer: str
     citations: tuple[HRSourceCitation, ...]
     insufficient_evidence: bool
+
+
+def _expand_short_question(
+    question: str,
+    llm_provider: LLMProvider,
+) -> str:
+    """Rewrite short questions into fuller search queries.
+
+    Short queries produce weak embeddings and weak BM25 matches. Rewriting
+    them into longer, more specific queries (using the same LLM that
+    already answers questions) lets both retrieval branches find the right
+    chunks. Returns the original question if expansion fails or the
+    question is already long enough.
+    """
+    if len(question.split()) >= 6:
+        return question
+    try:
+        expanded = llm_provider.generate(
+            system_prompt=(
+                "Rewrite the user's short question into a longer, more "
+                "specific search query that preserves the original meaning. "
+                "Return only the rewritten query, with no explanation, "
+                "quotes, or preamble."
+            ),
+            user_prompt=question,
+        )
+        if isinstance(expanded, str) and expanded.strip():
+            return expanded.strip()
+    except Exception:
+        logger.warning(
+            "Query expansion failed; falling back to original question",
+            extra={"question": question},
+        )
+    return question
 
 
 def _citation(
@@ -283,13 +321,16 @@ def answer_hr_question(
             "max_context_chars must be greater than zero.",
         )
 
+    search_query = _expand_short_question(question, llm_provider)
     results = retrieve_hr_chunks(
-        query=question,
+        query=search_query,
+        bm25_query=question,
         tenant_id=tenant_id,
         provider=embedding_provider,
         repository=repository,
         top_k=top_k,
         document_type=document_type,
+        search_mode="hybrid" if get_settings().use_hybrid_search else "vector",
     )
     if not results:
         return _insufficient_answer()

@@ -1,14 +1,15 @@
-"""Deterministic HR semantic retrieval over persisted chunk embeddings.
+"""Deterministic HR retrieval over persisted chunks and embeddings.
 
-The service embeds one query through the configured provider and delegates the
-vector search to the repository. It performs no answer generation, no prompt
-construction, no reranking, and no language-model call.
+The service embeds one query through the configured provider and delegates
+vector or hybrid ranking to the repository. It performs no answer generation,
+prompt construction, or language-model call.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from app.domain.retrieval import SemanticSearchRecord
@@ -125,8 +126,10 @@ def retrieve_hr_chunks(
     repository: EmbeddingRepository,
     top_k: int = DEFAULT_TOP_K,
     document_type: str | None = None,
+    search_mode: Literal["vector", "hybrid"] = "hybrid",
+    bm25_query: str | None = None,
 ) -> tuple[HRSemanticRetrievalResult, ...]:
-    """Return the closest active HR chunks for one tenant, closest first.
+    """Return active HR chunks for one tenant in repository ranking order.
 
     Repository ordering is preserved exactly; the service never reorders,
     reranks, or filters the matches it receives.
@@ -143,12 +146,23 @@ def retrieve_hr_chunks(
         )
 
     query_vector = embed_hr_query(query, provider)
-    records = repository.search_similar_chunks(
-        tenant_id=tenant_id,
-        query_vector=query_vector,
-        top_k=top_k,
-        model_name=provider.model_name,
-        model_version=provider.model_version,
-        document_type=document_type,
-    )
+    if search_mode == "hybrid":
+        records = repository.search_similar_chunks_hybrid(
+            tenant_id=tenant_id,
+            query_vector=query_vector,
+            query_text=bm25_query if bm25_query is not None else query,
+            top_k=top_k,
+            model_name=provider.model_name,
+            model_version=provider.model_version,
+            document_type=document_type,
+        )
+    else:
+        records = repository.search_similar_chunks(
+            tenant_id=tenant_id,
+            query_vector=query_vector,
+            top_k=top_k,
+            model_name=provider.model_name,
+            model_version=provider.model_version,
+            document_type=document_type,
+        )
     return tuple(_to_result(record) for record in records)
