@@ -49,6 +49,7 @@ export type DocumentUploadFailureKind =
   | "invalid"
   | "too_large"
   | "unauthenticated"
+  | "forbidden"
   | "unexpected";
 
 export class DocumentUploadError extends Error {
@@ -89,6 +90,7 @@ function failureKindForStatus(status: number): DocumentUploadFailureKind {
   if (status === 413) return "too_large";
   if (status === 415) return "unsupported";
   if (status === 401) return "unauthenticated";
+  if (status === 403) return "forbidden";
   if (status === 422) return "invalid";
   return "unexpected";
 }

@@ -8,6 +8,7 @@ import { ErrorNotice } from "./ErrorNotice";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
 import { DOCUMENT_TYPES } from "../api/documents";
 import type { DocumentType } from "../api/documents";
+import type { UserRole } from "../api/auth";
 
 const TENANT_ID = "real";
 
@@ -17,10 +18,11 @@ interface Failure {
 }
 
 interface ChatWorkspaceProps {
+  userRole: UserRole | undefined;
   onUnauthenticated: () => void;
 }
 
-export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
+export function ChatWorkspace({ onUnauthenticated, userRole }: ChatWorkspaceProps) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -53,7 +55,7 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
       const response = await askHrQuestion({
         question,
         tenant_id: TENANT_ID,
-        ...(documentType === "" ? {} : { document_type: documentType }),
+        ...(userRole === "admin" && documentType !== "" ? { document_type: documentType } : {}),
       });
       setTurns((previous) => [
         ...previous,
@@ -111,7 +113,8 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
         <div ref={endOfTranscript} />
       </div>
 
-      <DocumentUploadPanel onUnauthenticated={onUnauthenticated} />
+      {userRole === "admin" ? <DocumentUploadPanel onUnauthenticated={onUnauthenticated} /> : null}
+      {userRole === "admin" ? (
       <label className="chat__type-filter">
         Search document type
         <select
@@ -124,6 +127,7 @@ export function ChatWorkspace({ onUnauthenticated }: ChatWorkspaceProps) {
           {DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
         </select>
       </label>
+      ) : null}
       <ChatComposer
         isLoading={isLoading}
         onAsk={(question) => {

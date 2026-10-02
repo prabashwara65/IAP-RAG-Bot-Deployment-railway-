@@ -365,6 +365,7 @@ export function App() {
         />
       ) : (
         <ChatWorkspace
+          userRole={user.role}
           onUnauthenticated={() => {
             void handleLogout();
           }}
