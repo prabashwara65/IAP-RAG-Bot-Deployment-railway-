@@ -78,7 +78,7 @@ async def upload_document(
     try:
         persisted = persist_ingested_document(
             session,
-            tenant_id="tenant-synthetic",
+            tenant_id="tenant-real",
             content=content,
             document=ingested,
             embedding_provider=embedding_provider,
