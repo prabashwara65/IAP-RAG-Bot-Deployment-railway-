@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -39,6 +39,7 @@ class Settings(BaseSettings):
         max_length=120,
     )
     app_env: AppEnvironment = "development"
+    auto_activate_uploads: bool = True
     app_version: str = Field(default="0.1.0", pattern=r"^\d+\.\d+\.\d+$")
     log_level: LogLevel = "INFO"
     api_prefix: str = "/api/v1"
@@ -81,6 +82,17 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     smtp_from: str | None = None
     smtp_use_tls: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_auto_activation_default(cls, values: Any) -> Any:
+        """Enable demo auto-activation by default outside production."""
+        if isinstance(values, dict) and "auto_activate_uploads" not in values:
+            values["auto_activate_uploads"] = values.get("app_env", "development") in {
+                "development",
+                "test",
+            }
+        return values
 
     @field_validator(
         "app_name",

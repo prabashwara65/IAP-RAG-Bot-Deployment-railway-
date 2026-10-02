@@ -1,6 +1,7 @@
 """Integration tests for the authenticated document ingestion endpoint."""
 
 from typing import Any
+from unittest.mock import Mock
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
@@ -13,15 +14,21 @@ from httpx import ASGITransport, AsyncClient, Response
 from app.api.dependencies import get_current_user, get_embedding_provider, get_session
 from app.core.config import Settings
 from app.main import create_app
-from app.domain.documents import DocumentVersionStatus
+from app.domain.documents import DocumentVersionRecord, DocumentVersionStatus
 from app.services.document_ingestion import PersistedIngestedDocument
 
 UPLOAD_PATH = "/api/v1/documents/ingest"
 
 
-def _application(*, max_bytes: int = 2048, role: Role = Role.ADMIN) -> FastAPI:
+def _application(
+    *, max_bytes: int = 2048, auto_activate_uploads: bool = False
+) -> FastAPI:
     application = create_app(
-        Settings(app_env="test", document_max_bytes=max_bytes)
+        Settings(
+            app_env="test",
+            auto_activate_uploads=auto_activate_uploads,
+            document_max_bytes=max_bytes,
+        )
     )
     application.dependency_overrides[get_current_user] = lambda: UserAccount(
         id=uuid4(), email="account@example.com", display_name="Account",
@@ -56,7 +63,6 @@ async def test_upload_returns_persisted_chunk_preview(monkeypatch) -> None:
         "app.api.routes.documents.persist_ingested_document",
         lambda *args, **kwargs: PersistedIngestedDocument(
             document_key="UPLOAD-TEST",
-            document_type="CV",
             version_id=uuid4(),
             version_status=DocumentVersionStatus.CANDIDATE,
             chunk_count=2,
@@ -78,6 +84,36 @@ async def test_upload_returns_persisted_chunk_preview(monkeypatch) -> None:
         "Second part.",
     ]
     assert all(len(chunk["content_hash"]) == 64 for chunk in body["chunks"])
+
+
+async def test_upload_auto_activates_when_enabled(monkeypatch) -> None:
+    version_id = uuid4()
+    active_version = DocumentVersionRecord(
+        id=version_id,
+        document_id=uuid4(),
+        version_label="1.0",
+        status=DocumentVersionStatus.ACTIVE,
+        content_hash="content-hash",
+    )
+    activate = Mock(return_value=active_version)
+    monkeypatch.setattr("app.api.routes.documents.activate_document", activate)
+    monkeypatch.setattr(
+        "app.api.routes.documents.persist_ingested_document",
+        lambda *args, **kwargs: PersistedIngestedDocument(
+            document_key="UPLOAD-TEST",
+            version_id=version_id,
+            version_status=DocumentVersionStatus.CANDIDATE,
+            chunk_count=1,
+        ),
+    )
+
+    response = await _upload(
+        _application(auto_activate_uploads=True), "guide.txt", b"Upload content"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["version_status"] == "active"
+    activate.assert_called_once()
 
 
 async def test_upload_rejects_unsupported_extension() -> None:
