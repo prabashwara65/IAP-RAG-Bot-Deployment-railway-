@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '0007_merge_hybrid_and_saved_chats'
+revision: str = '0007_merge_heads'
 down_revision: str | None = ('0006_hybrid_search', '0006_saved_chats')
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

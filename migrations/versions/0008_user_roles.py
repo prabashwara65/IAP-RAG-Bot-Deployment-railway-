@@ -12,7 +12,7 @@ from alembic import op
 
 
 revision: str = "0008_user_roles"
-down_revision: str | None = "0007_merge_hybrid_and_saved_chats"
+down_revision: str | None = "0007_merge_heads"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
