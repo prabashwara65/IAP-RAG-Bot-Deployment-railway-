@@ -10,7 +10,7 @@ import { DOCUMENT_TYPES } from "../api/documents";
 import type { DocumentType } from "../api/documents";
 import type { UserRole } from "../api/auth";
 
-const TENANT_ID = "tenant-synthetic";
+const TENANT_ID = "real";
 
 interface Failure {
   kind: HrAskFailureKind;
