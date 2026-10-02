@@ -10,6 +10,7 @@ from app.models.documents import (
     EmbeddingModel,
     EmbeddingSetModel,
 )
+from app.models.saved_chats import SavedChatModel
 from app.models.users import OtpChallengeModel, SessionModel, UserModel
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "EmbeddingModel",
     "EmbeddingSetModel",
     "OtpChallengeModel",
+    "SavedChatModel",
     "SessionModel",
     "UserModel",
 ]

@@ -16,6 +16,7 @@ import { LogoutConfirmModal } from "./components/LogoutConfirmModal";
 import { ManageUsersScreen } from "./components/ManageUsersScreen";
 import { SuccessModal } from "./components/SuccessModal";
 import { ProfileScreen } from "./components/ProfileScreen";
+import { clearActiveChat } from "./services/activeChatStorage";
 
 type Screen = "auth" | "otp" | "chat" | "profile" | "users" | "sign-in-success";
 
@@ -147,6 +148,9 @@ export function App() {
   }, [user]);
 
   async function handleLogout() {
+    if (user !== null) {
+      clearActiveChat(user.id);
+    }
     await logoutRequest();
 
     setUser(null);
@@ -215,6 +219,7 @@ export function App() {
   }, [screen]);
 
   function acceptSignIn(profile: Profile) {
+    clearActiveChat(profile.id);
     setUser(profile);
     setOtp(null);
     applyTheme(profile.theme);
@@ -365,6 +370,8 @@ export function App() {
         />
       ) : (
         <ChatWorkspace
+          userId={user.id}
+          userRole={user.role}
           onUnauthenticated={() => {
             void handleLogout();
           }}

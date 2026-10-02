@@ -50,6 +50,7 @@ const TEST_USER = {
   id: "11111111-1111-1111-1111-111111111111",
   email: "ada@example.com",
   display_name: "Ada Lovelace",
+  role: "admin" as const,
   theme: "light" as const,
   has_avatar: false,
 };
@@ -101,7 +102,7 @@ function hrAskCalls() {
 }
 
 function composer(): HTMLTextAreaElement {
-  return screen.getByLabelText(/your hr question/i) as HTMLTextAreaElement;
+  return screen.getByLabelText(/your (hr )?question/i) as HTMLTextAreaElement;
 }
 
 function sendButton(): HTMLElement {
@@ -136,7 +137,7 @@ describe("conversation", () => {
     await renderChat();
 
     expect(
-      screen.getByRole("heading", { name: "OIAP HR Assistant" }),
+      screen.getByRole("heading", { name: /welcome to the office assistant/i }),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText(/tenant id/i)).not.toBeInTheDocument();
   });
@@ -153,7 +154,7 @@ describe("conversation", () => {
     ) as [string, RequestInit];
     expect(JSON.parse(String(askCall[1].body))).toEqual({
       question: "How much leave?",
-      tenant_id: "tenant-synthetic",
+      tenant_id: "real",
     });
   });
 
@@ -175,7 +176,7 @@ describe("conversation", () => {
     ) as [string, RequestInit];
     expect(JSON.parse(String(askCall[1].body))).toEqual({
       question: "Find information in CV documents.",
-      tenant_id: "tenant-synthetic",
+      tenant_id: "real",
       document_type: "CV",
     });
   });
