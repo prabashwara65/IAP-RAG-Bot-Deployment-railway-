@@ -1,4 +1,4 @@
-"""Authenticated document extraction and candidate-vector persistence endpoint."""
+"""Admin-only document extraction and candidate-vector persistence endpoint."""
 
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user, get_embedding_provider, get_session
+from app.api.dependencies import get_embedding_provider, get_session
+from app.api.permissions import get_current_admin
 from app.core.config import Settings
 from app.core.rate_limit import enforce_rate_limit
 from app.providers.embeddings import EmbeddingProvider
@@ -37,7 +38,7 @@ from app.services.document_ingestion import (
 router = APIRouter(
     prefix="/documents",
     tags=["documents"],
-    dependencies=[Depends(enforce_rate_limit), Depends(get_current_user)],
+    dependencies=[Depends(get_current_admin), Depends(enforce_rate_limit)],
 )
 
 _ERROR_STATUS = {

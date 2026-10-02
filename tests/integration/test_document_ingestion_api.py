@@ -4,7 +4,11 @@ from typing import Any
 from unittest.mock import Mock
 from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+import pytest
+from datetime import UTC, datetime
+from app.domain.accounts import UserAccount
+from app.domain.roles import Role
 from httpx import ASGITransport, AsyncClient, Response
 
 from app.api.dependencies import get_current_user, get_embedding_provider, get_session
@@ -26,7 +30,10 @@ def _application(
             document_max_bytes=max_bytes,
         )
     )
-    application.dependency_overrides[get_current_user] = lambda: object()
+    application.dependency_overrides[get_current_user] = lambda: UserAccount(
+        id=uuid4(), email="account@example.com", display_name="Account",
+        theme="light", avatar_path=None, created_at=datetime.now(UTC), role=role,
+    )
     application.dependency_overrides[get_embedding_provider] = lambda: object()
 
     def session_dependency():
@@ -119,3 +126,24 @@ async def test_upload_rejects_files_over_configured_limit() -> None:
     response = await _upload(_application(max_bytes=1024), "guide.txt", b"x" * 1025)
 
     assert response.status_code == 413
+
+@pytest.mark.parametrize("role", [Role.USER, Role.HR, Role.EMPLOYEE, Role.STUDENT])
+async def test_upload_denies_every_non_admin_before_processing(role, monkeypatch) -> None:
+    def unexpected_processing(*args, **kwargs):
+        raise AssertionError("An unauthorized upload must not be processed")
+    monkeypatch.setattr("app.api.routes.documents.ingest_document", unexpected_processing)
+    monkeypatch.setattr("app.api.routes.documents.persist_ingested_document", unexpected_processing)
+    application = _application(role=role)
+    application.dependency_overrides[get_embedding_provider] = unexpected_processing
+    response = await _upload(application, "guide.txt", b"Some text")
+    assert response.status_code == 403
+    assert "Only administrators" in str(response.json())
+
+
+async def test_upload_requires_sign_in() -> None:
+    application = _application()
+    def unauthenticated():
+        raise HTTPException(401, "Sign in required.")
+    application.dependency_overrides[get_current_user] = unauthenticated
+    response = await _upload(application, "guide.txt", b"Some text")
+    assert response.status_code == 401

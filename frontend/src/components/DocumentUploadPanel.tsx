@@ -12,6 +12,7 @@ const ERROR_MESSAGES: Record<DocumentUploadFailureKind, string> = {
   invalid: "This file could not be read, or it contains no extractable text.",
   too_large: "The file is larger than the 20 MB upload limit.",
   unauthenticated: "Your session has ended. Sign in again to upload documents.",
+  forbidden: "Only administrators can upload documents. Your account does not have upload permission.",
   unexpected: "The document could not be processed. Try another file.",
 };
 
