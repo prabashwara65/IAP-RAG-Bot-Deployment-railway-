@@ -9,7 +9,7 @@ import { DocumentUploadPanel } from "./DocumentUploadPanel";
 import { DOCUMENT_TYPES } from "../api/documents";
 import type { DocumentType } from "../api/documents";
 
-const TENANT_ID = "real";
+const TENANT_ID = "tenant-synthetic";
 
 interface Failure {
   kind: HrAskFailureKind;

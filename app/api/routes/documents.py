@@ -26,6 +26,7 @@ from app.schemas.document_ingestion import (
     DocumentIngestionResponse,
 )
 from app.schemas.hr_documents import DocumentType
+from app.services.document_activation import activate_document
 from app.services.document_ingestion import (
     DocumentIngestionError,
     DocumentIngestionErrorCode,
@@ -88,12 +89,22 @@ async def upload_document(
             detail="The document could not be embedded for vector storage.",
         ) from error
 
+    version_status = persisted.version_status
+    activated_document_type = document_type.value
+    if settings.auto_activate_uploads:
+        version_status = activate_document(
+            session,
+            persisted.document_key,
+            version_id=persisted.version_id,
+        ).status
+        activated_document_type = "CV"
+
     return DocumentIngestionResponse(
         filename=ingested.filename,
-        document_type=document_type.value,
+        document_type=activated_document_type,
         document_key=persisted.document_key,
         version_id=persisted.version_id,
-        version_status=persisted.version_status.value,
+        version_status=version_status.value,
         chunk_count=len(ingested.chunks),
         chunks=[
             DocumentChunkResponse(
