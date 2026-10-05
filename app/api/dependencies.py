@@ -25,10 +25,13 @@ from app.providers.gemini_embeddings import (
 from app.providers.gemini_llm import GeminiLLMError, gemini_llm_provider_from_settings
 from app.providers.llm import LLMProvider
 from app.repositories.embeddings import EmbeddingRepository
+from app.repositories.events import EventRepository
 from app.repositories.postgres.embeddings import PostgresEmbeddingRepository
 from app.repositories.sqlalchemy_users import SQLAlchemyUserAccountRepository
 from app.repositories.users import UserAccountRepository
 from app.services.auth import AuthError, AuthService
+from app.services.event_mail import event_mailer_from_settings
+from app.services.events import EventService
 
 logger = get_logger("api.dependencies")
 
@@ -159,3 +162,10 @@ def get_llm_provider(request: Request) -> LLMProvider:
 
     request.app.state.llm_provider = provider
     return provider
+def get_event_service(
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_request_settings)],
+) -> EventService:
+    return EventService(
+        EventRepository(session), settings, event_mailer_from_settings(settings), session.commit,
+    )

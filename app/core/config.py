@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -83,6 +84,46 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     smtp_from: str | None = None
     smtp_use_tls: bool = True
+
+    calendar_timezone: str = "UTC"
+    event_smtp_host: str = Field(default="smtp.gmail.com", min_length=1, max_length=255)
+    event_smtp_port: int = Field(default=587, ge=1, le=65535)
+    event_smtp_username: str | None = None
+    event_smtp_password: SecretStr | None = None
+    event_smtp_from: str | None = None
+    event_smtp_use_tls: bool = True
+
+    @field_validator("calendar_timezone")
+    @classmethod
+    def validate_calendar_timezone(cls, value: str) -> str:
+        value = value.strip()
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise ValueError("CALENDAR_TIMEZONE must be a valid IANA timezone.") from error
+        return value
+
+    @field_validator("event_smtp_host")
+    @classmethod
+    def validate_event_smtp_host(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("EVENT_SMTP_HOST must not be blank.")
+        return value
+
+    @property
+    def calendar_zone(self) -> ZoneInfo:
+        return ZoneInfo(self.calendar_timezone)
+
+    @property
+    def event_smtp_is_configured(self) -> bool:
+        username = (self.event_smtp_username or "").strip()
+        sender = (self.event_smtp_from or username).strip()
+        password = (
+            self.event_smtp_password.get_secret_value().strip()
+            if self.event_smtp_password is not None else ""
+        )
+        return bool(username and sender and password)
 
     @model_validator(mode="before")
     @classmethod

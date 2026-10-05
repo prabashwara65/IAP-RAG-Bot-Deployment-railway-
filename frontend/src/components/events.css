@@ -1,0 +1,282 @@
+/* ==================================================
+   Events - Container
+   ================================================== */
+.sidebar-events {
+  min-width: 0;
+  padding: 0 3px 14px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--shell-line);
+  color: var(--text);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.sidebar-events[hidden] {
+  display: none;
+}
+.sidebar-events button:focus-visible,
+.sidebar-events input:focus-visible,
+.sidebar-events select:focus-visible,
+.sidebar-events textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.events-icon-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--shell-row);
+  font: inherit;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.events-reload {
+  padding: 0.4rem 0;
+  color: var(--accent-strong);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+/* ==================================================
+   Events - Calendar
+   ================================================== */
+.events-calendar {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--shell-line);
+}
+.events-calendar__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  margin-bottom: 0.4rem;
+}
+.events-calendar__picker {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.events-calendar__picker select,
+.events-calendar__picker input {
+  min-width: 0;
+  height: 30px;
+  padding: 0.2rem;
+  border: 1px solid var(--shell-line);
+  border-radius: 6px;
+  background: var(--shell-input);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.68rem;
+}
+.events-calendar__picker select {
+  flex: 1;
+  width: 0;
+}
+.events-calendar__picker input {
+  width: 3.8rem;
+}
+.events-calendar__hint {
+  padding-top: 0.5rem;
+}
+
+/* ==================================================
+   Events - Selected Date
+   ================================================== */
+.events-selected {
+  margin: 0.7rem 0 0.2rem;
+  color: var(--text);
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+
+/* ==================================================
+   Events - Calendar Grid
+   ================================================== */
+.events-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  text-align: center;
+}
+.events-calendar__weekday {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  padding: 0.3rem 0;
+}
+.events-calendar__day {
+  position: relative;
+  min-width: 0;
+  min-height: 29px;
+  padding: 0.25rem 0 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.73rem;
+  cursor: pointer;
+}
+.events-calendar__day:hover:not(:disabled) {
+  background: var(--shell-row);
+}
+.events-calendar__day[data-today="true"] {
+  border-color: var(--accent);
+}
+.events-calendar__day[aria-pressed="true"],
+.events-calendar__day[aria-pressed="true"]:hover {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.events-calendar__dot {
+  position: absolute;
+  bottom: 0.15rem;
+  left: calc(50% - 2px);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ==================================================
+   Events - Form
+   ================================================== */
+.events-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.6rem 0;
+}
+.events-form h3,
+.events-list h3 {
+  margin: 0.25rem 0;
+  font-size: 0.78rem;
+}
+.events-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.73rem;
+}
+.events-form .field__input {
+  min-width: 0;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.75rem;
+}
+.events-form textarea {
+  resize: vertical;
+  min-height: 65px;
+  max-height: 160px;
+}
+.sidebar-events .btn {
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.73rem;
+}
+.sidebar-events .notice {
+  padding: 0.5rem;
+  font-size: 0.72rem;
+}
+
+/* ==================================================
+   Events - Event List
+   ================================================== */
+.events-muted {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin: 0.2rem 0;
+}
+.events-list ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  list-style: none;
+}
+.events-item {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  background: var(--shell-row);
+}
+.events-item > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.events-item strong {
+  font-size: 0.76rem;
+}
+
+/* ==================================================
+   Events - Disabled States
+   ================================================== */
+.sidebar-events button:disabled,
+.sidebar-events input:disabled,
+.sidebar-events select:disabled,
+.sidebar-events textarea:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* ==================================================
+   Events - Actions
+   ================================================== */
+.events-form__actions,
+.events-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.events-form__actions .btn {
+  flex: 1;
+  width: auto;
+}
+.events-item__actions,
+.events-delete-confirm {
+  margin-top: 0.5rem;
+}
+.events-delete-confirm p {
+  font-size: 0.72rem;
+}
+/* ==================================================
+   Events - Form Checkbox
+   ================================================== */
+.events-form .events-email-option {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.events-email-option input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* ==================================================
+   Events - Responsive
+   ================================================== */
+@media (max-width: 760px) {
+  .events-icon-button {
+    width: 30px;
+    height: 34px;
+  }
+  .events-calendar__day {
+    min-height: 34px;
+  }
+}

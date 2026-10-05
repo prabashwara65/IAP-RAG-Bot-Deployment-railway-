@@ -8,7 +8,6 @@ import {
 } from "./api/auth";
 import type { OtpIssued, Profile, ThemePreference } from "./api/auth";
 import { getAccessToken, setAccessToken } from "./api/session";
-import { AppHeader } from "./components/AppHeader";
 import { AuthScreen } from "./components/AuthScreen";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { OtpScreen } from "./components/OtpScreen";
@@ -348,89 +347,32 @@ export function App() {
   }
 
   return (
-    <div
-      className={
-        screen === "profile"
-          ? "page page--profile"
-          : "page"
-      }
-    >
-      <AppHeader
-        active={
-          screen === "profile"
-            ? "profile"
-            : screen === "users"
-              ? "users"
-              : "chat"
-        }
-        avatarUrl={avatarUrl}
-        onLogout={() => setLogoutOpen(true)}
+    <>
+      <ChatWorkspace key={user.id} userId={user.id} userRole={user.role} user={user} avatarUrl={avatarUrl}
         onOpenChat={() => setScreen("chat")}
         onOpenProfile={() => setScreen("profile")}
-        onOpenUsers={() => {
-          if (user.role === "admin") {
-            setScreen("users");
-          }
-        }}
-        onThemeChange={(theme) => {
-          void handleTheme(theme);
-        }}
-        theme={user.theme}
-        user={user}
+        onOpenUsers={() => { if (user.role === "admin") setScreen("users"); }}
+        onThemeChange={(theme) => { void handleTheme(theme); }}
+        onLogout={() => setLogoutOpen(true)}
+        onUnauthenticated={() => { void handleLogout(); }}
+        content={screen === "users" && user.role === "admin" ? (
+          <ManageUsersScreen currentUser={user}
+            onUnauthenticated={() => { void handleLogout(); }}
+            onAccessDenied={() => { void handleAccessDenied(); }} />
+        ) : screen === "profile" ? (
+          <ProfileScreen avatarUrl={avatarUrl}
+            onAvatarChanged={() => { void loadAvatar(user); }}
+            onClose={() => setScreen("chat")}
+            onUpdated={(profile) => {
+              setUser(profile);
+              applyTheme(profile.theme);
+              void loadAvatar(profile);
+            }} user={user} />
+        ) : undefined}
       />
-
-      {screen === "users" && user.role === "admin" ? (
-        <ManageUsersScreen
-          currentUser={user}
-          onUnauthenticated={() => {
-            void handleLogout();
-          }}
-          onAccessDenied={() => {
-            void handleAccessDenied();
-          }}
-        />
-      ) : screen === "profile" ? (
-        <ProfileScreen
-          avatarUrl={avatarUrl}
-          onAvatarChanged={() => {
-            void loadAvatar(user);
-          }}
-          onClose={() => setScreen("chat")}
-          onUpdated={(profile) => {
-            setUser(profile);
-            applyTheme(profile.theme);
-
-            void loadAvatar(profile);
-          }}
-          user={user}
-        />
-      ) : (
-        <ChatWorkspace
-          userId={user.id}
-          userRole={user.role}
-          onUnauthenticated={() => {
-            void handleLogout();
-          }}
-        />
-      )}
-
-      <LogoutConfirmModal
-        isLoggingOut={isLoggingOut}
-        isOpen={logoutOpen}
-        onCancel={() => setLogoutOpen(false)}
-        onConfirm={() => {
-          void confirmLogout();
-        }}
-      />
-
+      <LogoutConfirmModal isLoggingOut={isLoggingOut} isOpen={logoutOpen}
+        onCancel={() => setLogoutOpen(false)} onConfirm={() => { void confirmLogout(); }} />
       {successModal}
-
-      <footer className="page__footer">
-        <p>
-          Answers are generated only from documents approved for retrieval.
-          Always confirm anything consequential with your team.
-        </p>
-      </footer>
-    </div>
+    </>
   );
 }

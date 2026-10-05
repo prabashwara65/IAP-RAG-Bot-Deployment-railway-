@@ -66,6 +66,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function routeFetch(url: string, ask: () => Response): Response {
+  if (url.includes("/api/v1/chats")) return jsonResponse([]);
   if (url.includes("/api/v1/me/avatar")) {
     return new Response(null, { status: 404 });
   }
@@ -137,12 +138,12 @@ describe("conversation", () => {
     await renderChat();
 
     expect(
-      screen.getByRole("heading", { name: /welcome to the office assistant/i }),
+      screen.getByRole("heading", { name: /how can I help, Ada/i }),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText(/tenant id/i)).not.toBeInTheDocument();
   });
 
-  it("keeps the fixed synthetic tenant in the request body", async () => {
+  it("keeps the existing tenant in the request body", async () => {
     mockSequence(LEAVE_ANSWER);
     await renderChat();
 
@@ -154,7 +155,7 @@ describe("conversation", () => {
     ) as [string, RequestInit];
     expect(JSON.parse(String(askCall[1].body))).toEqual({
       question: "How much leave?",
-      tenant_id: "real",
+      tenant_id: "tenant-real",
     });
   });
 
@@ -162,6 +163,7 @@ describe("conversation", () => {
     mockSequence(LEAVE_ANSWER);
     await renderChat();
     const user = userEvent.setup();
+    await user.click(screen.getByText("Documents", { selector: "summary" }));
     await user.selectOptions(screen.getByLabelText(/search document type/i), "CV");
 
     await user.type(
@@ -176,7 +178,7 @@ describe("conversation", () => {
     ) as [string, RequestInit];
     expect(JSON.parse(String(askCall[1].body))).toEqual({
       question: "Find information in CV documents.",
-      tenant_id: "real",
+      tenant_id: "tenant-real",
       document_type: "CV",
     });
   });
@@ -429,6 +431,7 @@ describe("evidence and failures", () => {
       "fetch",
       vi.fn(async (input) => {
         const url = String(input);
+        if (url.includes("/api/v1/chats")) return jsonResponse([]);
         if (url.includes("/api/v1/me/avatar")) {
           return new Response(null, { status: 404 });
         }
@@ -505,6 +508,7 @@ describe("composer", () => {
       "fetch",
       vi.fn(async (input) => {
         const url = String(input);
+        if (url.includes("/api/v1/chats")) return jsonResponse([]);
         if (url.includes("/api/v1/me/avatar")) {
           return new Response(null, { status: 404 });
         }
@@ -539,7 +543,8 @@ describe("composer", () => {
     await ask("How much leave?");
 
     await screen.findByText(LEAVE_ANSWER_VISIBLE);
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    // Only the transcript scrolls; the page and its ancestors stay in place.
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 });
 

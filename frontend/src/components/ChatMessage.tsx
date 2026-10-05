@@ -1,5 +1,6 @@
 import type { HrAskResponse } from "../api/hrRag";
 import { CitationList } from "./CitationList";
+import { ShellIcon } from "./ShellIcon";
 
 export interface UserTurn {
   id: string;
@@ -56,6 +57,8 @@ export function ChatMessage({ turn }: { turn: ChatTurn }) {
 
   return (
     <article className="message message--assistant">
+      <span className="assistant-mark"><ShellIcon name="assistant" /></span>
+      <div className="message__content">
       <header className="message__header">
         <p className="message__role">HR Assistant</p>
         {insufficient ? (
@@ -72,6 +75,7 @@ export function ChatMessage({ turn }: { turn: ChatTurn }) {
       ) : null}
 
       <CitationList citations={turn.response.citations} />
+      </div>
     </article>
   );
 }
