@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { MAX_QUESTION_LENGTH } from "../api/hrRag";
 
@@ -23,6 +23,14 @@ export function ChatComposer({ isLoading, onAsk }: ChatComposerProps) {
 
   const trimmedQuestion = question.trim();
   const canSubmit = !isLoading && trimmedQuestion.length > 0;
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = Math.min(textarea.scrollHeight || 28, 140) + "px";
+    }
+  }, [question]);
 
   function submit() {
     if (!canSubmit) {
@@ -62,7 +70,7 @@ export function ChatComposer({ isLoading, onAsk }: ChatComposerProps) {
           onKeyDown={handleKeyDown}
           placeholder="Ask about leave, remote work, expenses or probation…"
           ref={textareaRef}
-          rows={2}
+          rows={1}
           value={question}
         />
         <button
@@ -71,7 +79,11 @@ export function ChatComposer({ isLoading, onAsk }: ChatComposerProps) {
           type="submit"
           aria-label="Send question"
         >
-          {isLoading ? "Sending…" : "Send"}
+          {isLoading ? <span className="composer__spinner" aria-hidden="true" /> :
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 19V5m-6 6 6-6 6 6" />
+            </svg>}
         </button>
       </div>
       <p className="composer__hint">

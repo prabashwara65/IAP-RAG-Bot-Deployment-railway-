@@ -10,6 +10,7 @@ from app.models.documents import (
     EmbeddingModel,
     EmbeddingSetModel,
 )
+from app.models.events import CalendarEventModel
 from app.models.saved_chats import SavedChatModel
 from app.models.users import OtpChallengeModel, SessionModel, UserModel
 
@@ -17,6 +18,7 @@ __all__ = [
     "ApprovalDecisionModel",
     "AuditEventModel",
     "Base",
+    "CalendarEventModel",
     "ChunkModel",
     "DocumentModel",
     "DocumentVersionModel",

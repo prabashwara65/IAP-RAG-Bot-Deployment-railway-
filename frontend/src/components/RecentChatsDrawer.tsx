@@ -1,191 +1,104 @@
 import { useEffect, useState } from "react";
 import { deleteSavedChat, listSavedChats } from "../api/savedChats";
 import type { SavedChatSummary } from "../api/savedChats";
+import { ShellIcon } from "./ShellIcon";
 
 interface RecentChatsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectChat: (chatId: string) => void;
+  variant?: "drawer" | "sidebar";
+  refreshKey?: number;
+  activeChatId?: string | null;
+  disabled?: boolean;
 }
 
-export function RecentChatsDrawer({
-  isOpen,
-  onClose,
-  onSelectChat,
-}: RecentChatsDrawerProps) {
+function groupChats(chats: SavedChatSummary[]) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const week = new Date(today);
+  week.setDate(week.getDate() - 7);
+  const groups: Record<string, SavedChatSummary[]> = { Today: [], "Previous 7 days": [], Older: [] };
+  [...chats].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).forEach((chat) => {
+    const date = new Date(chat.updated_at);
+    const label = date >= today ? "Today" : date >= week ? "Previous 7 days" : "Older";
+    groups[label]!.push(chat);
+  });
+  return Object.entries(groups).filter(([, items]) => items.length > 0);
+}
+
+export function RecentChatsDrawer({ isOpen, onClose, onSelectChat, variant = "drawer",
+  refreshKey = 0, activeChatId = null, disabled = false }: RecentChatsDrawerProps) {
   const [chats, setChats] = useState<SavedChatSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-
     let cancelled = false;
     async function load() {
       setIsLoading(true);
       setError(null);
       try {
         const items = await listSavedChats();
-        if (!cancelled) {
-          setChats(items);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load chats");
-        }
+        if (!cancelled) setChats(items);
+      } catch {
+        if (!cancelled) setError("Chat history is temporarily unavailable.");
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+        if (!cancelled) setIsLoading(false);
       }
     }
-
     void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen]);
+    return () => { cancelled = true; };
+  }, [isOpen, refreshKey, reload]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+    if (!isOpen || variant !== "drawer") return;
+    function escape(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
+    document.addEventListener("keydown", escape);
+    return () => document.removeEventListener("keydown", escape);
+  }, [isOpen, onClose, variant]);
 
-  async function handleDelete(event: React.MouseEvent, chatId: string) {
-    event.stopPropagation();
+  async function remove(chatId: string) {
+    if (deleting !== null) return;
+    setDeleting(chatId);
     try {
       await deleteSavedChat(chatId);
-      setChats((prev) => prev.filter((c) => c.id !== chatId));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete chat");
-    }
-  }
-
-  function formatDate(iso: string): string {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return iso;
-    }
+      setChats((previous) => previous.filter((chat) => chat.id !== chatId));
+      setError(null);
+    } catch { setError("Could not delete this chat. Try again."); }
+    finally { setDeleting(null); }
   }
 
   if (!isOpen) return null;
-
-  return (
-    <div
-      className="recent-chats-backdrop"
-      onClick={onClose}
-      role="presentation"
-    >
-      <aside
-        className="recent-chats-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Recent Saved Chats"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="recent-chats-drawer__header">
-          <div className="recent-chats-drawer__title-group">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <h2>Recent Chats</h2>
-          </div>
-          <button
-            type="button"
-            className="recent-chats-drawer__close"
-            onClick={onClose}
-            aria-label="Close recent chats"
-          >
-            ✕
-          </button>
-        </div>
-
-        {error ? (
-          <div className="recent-chats-drawer__error" role="alert">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="recent-chats-drawer__body">
-          {isLoading ? (
-            <div className="recent-chats-drawer__status">Loading saved chats&hellip;</div>
-          ) : chats.length === 0 ? (
-            <div className="recent-chats-drawer__empty">
-              <p>No saved chats yet.</p>
-              <span>Click "Save Chat" during any conversation to save it to your account.</span>
-            </div>
-          ) : (
-            <ul className="recent-chats-list">
-              {chats.map((chat) => (
-                <li key={chat.id}>
-                  <button
-                    type="button"
-                    className="recent-chat-item"
-                    onClick={() => {
-                      onSelectChat(chat.id);
-                      onClose();
-                    }}
-                  >
-                    <div className="recent-chat-item__content">
-                      <span className="recent-chat-item__title" title={chat.title}>
-                        {chat.title}
-                      </span>
-                      <span className="recent-chat-item__meta">
-                        {formatDate(chat.updated_at)} &bull; {chat.message_count} {chat.message_count === 1 ? "turn" : "turns"}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="recent-chat-item__delete"
-                      onClick={(e) => void handleDelete(e, chat.id)}
-                      title="Delete saved chat"
-                      aria-label={`Delete ${chat.title}`}
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </aside>
+  const content = <>
+    <div className="chat-history__heading"><h2>Chat History</h2>
+      <button type="button" className="shell-icon-button" disabled={isLoading || deleting !== null}
+        aria-label="Refresh chat history" onClick={() => setReload((previous) => previous + 1)}>
+        <ShellIcon name="refresh" />
+      </button>
     </div>
-  );
+    {error ? <p className="chat-history__error" role="alert">{error}</p> : null}
+    {isLoading ? <p className="chat-history__empty" role="status">Loading saved chats&hellip;</p> : chats.length === 0 && !error ?
+      <p className="chat-history__empty">Your saved chats will appear here. Use Save Chat to keep a conversation.</p> : null}
+    {!isLoading ? groupChats(chats).map(([label, items]) => <section className="chat-history__group" aria-label={label} key={label}>
+      <h3>{label}</h3><ul>{items.map((chat) => <li className={"chat-history__row" + (activeChatId === chat.id ? " is-active" : "")} key={chat.id}>
+        <button type="button" className="chat-history__open" title={chat.title} disabled={disabled || deleting === chat.id}
+          aria-current={activeChatId === chat.id ? "page" : undefined}
+          onClick={() => { onSelectChat(chat.id); onClose(); }}>{chat.title}</button>
+        <button type="button" className="shell-icon-button chat-history__delete" disabled={disabled || deleting !== null}
+          aria-label={"Delete " + chat.title} onClick={() => void remove(chat.id)}><ShellIcon name="delete" /></button>
+      </li>)}</ul>
+    </section>) : null}
+  </>;
+
+  if (variant === "sidebar") return <section className="chat-history" aria-label="Chat history">{content}</section>;
+  return <div className="recent-chats-backdrop" role="presentation" onClick={onClose}>
+    <aside className="recent-chats-drawer" role="dialog" aria-modal="true" aria-label="Recent Saved Chats" onClick={(event) => event.stopPropagation()}>
+      <button type="button" className="shell-icon-button" aria-label="Close recent chats" onClick={onClose}><ShellIcon name="close" /></button>
+      {content}
+    </aside>
+  </div>;
 }
